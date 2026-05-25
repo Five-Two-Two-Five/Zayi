@@ -14,7 +14,7 @@ class SaleScreen extends ConsumerStatefulWidget {
 }
 
 class _SaleScreenState extends ConsumerState<SaleScreen> {
-  final _traysController = TextEditingController();
+  final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
   final _deliveryController = TextEditingController(text: '0');
   final _employeeController = TextEditingController(text: '0');
@@ -102,8 +102,8 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                       loading: () => const CircularProgressIndicator(),
                       error: (e, s) => const Text('Error loading customers'),
                     ),
-                    TextField(controller: _traysController, decoration: const InputDecoration(labelText: 'Trays Sold'), keyboardType: TextInputType.number, enabled: !_isSaving),
-                    TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Tray'), keyboardType: TextInputType.number, enabled: !_isSaving),
+                    TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates Sold'), keyboardType: TextInputType.number, enabled: !_isSaving),
+                    TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _deliveryController, decoration: const InputDecoration(labelText: 'Delivery Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _employeeController, decoration: const InputDecoration(labelText: 'Employee Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _paidController, decoration: const InputDecoration(labelText: 'Amount Paid'), keyboardType: TextInputType.number, enabled: !_isSaving),
@@ -125,7 +125,7 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                 }, child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: _isSaving ? null : () async {
-                    final trays = int.tryParse(_traysController.text);
+                    final cratesCount = int.tryParse(_cratesController.text);
                     final price = double.tryParse(_priceController.text);
                     final delivery = double.tryParse(_deliveryController.text) ?? 0.0;
                     final employee = double.tryParse(_employeeController.text) ?? 0.0;
@@ -133,7 +133,7 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
 
                     if ((!_isQuickAddingCustomer && _selectedCustomer == null) || 
                         (_isQuickAddingCustomer && _newNameController.text.isEmpty) ||
-                        trays == null || price == null) {
+                        cratesCount == null || price == null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields correctly')));
                       return;
                     }
@@ -154,15 +154,15 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                         await ref.read(customersProvider.notifier).refresh();
                       }
 
-                      final revenue = trays * price;
+                      final revenue = cratesCount * price;
                       
                       double buyingPrice = 0.0;
                       final purchases = await DatabaseHelper.instance.getAllPurchases();
                       if (purchases.isNotEmpty) {
-                        buyingPrice = purchases.first.buyingPricePerTray;
+                        buyingPrice = purchases.first.buyingPricePerCrate;
                       }
 
-                      final totalCost = (trays * buyingPrice) + delivery + employee;
+                      final totalCost = (cratesCount * buyingPrice) + delivery + employee;
                       final profit = revenue - totalCost;
                       final balance = revenue - paid;
 
@@ -170,8 +170,8 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
 
                       final sale = Sale(
                         customerId: _selectedCustomer!.id!,
-                        traysSold: trays,
-                        sellingPricePerTray: price,
+                        cratesSold: cratesCount,
+                        sellingPricePerCrate: price,
                         deliveryCost: delivery,
                         employeeCost: employee,
                         totalRevenue: revenue,
@@ -190,7 +190,7 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                       ref.invalidate(inventoryBalanceProvider);
                       ref.invalidate(dashboardSummaryProvider);
 
-                      _traysController.clear();
+                      _cratesController.clear();
                       _priceController.clear();
                       _deliveryController.text = '0';
                       _employeeController.text = '0';
@@ -254,7 +254,7 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                     child: Card(
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
-                        title: Text('${s.traysSold} Trays @ \$${s.sellingPricePerTray}'),
+                        title: Text('${s.cratesSold} Crates @ \$${s.sellingPricePerCrate}'),
                         subtitle: Text('Revenue: \$${s.totalRevenue.toStringAsFixed(2)}\nProfit: \$${s.profit.toStringAsFixed(2)}\nDue: \$${s.balanceDue.toStringAsFixed(2)}'),
                         isThreeLine: true,
                         trailing: const Icon(Icons.sell, color: Colors.orange),

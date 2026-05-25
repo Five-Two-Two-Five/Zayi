@@ -25,9 +25,17 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE purchases ADD COLUMN remaining_eggs INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE sales ADD COLUMN eggs_sold INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -63,6 +71,7 @@ class DatabaseHelper {
         id $idType,
         supplier_id $intType,
         trays $intType,
+        remaining_eggs $intType,
         buying_price_per_tray $realType,
         transport_cost $realType,
         other_cost $realType,
@@ -80,6 +89,7 @@ class DatabaseHelper {
         id $idType,
         customer_id $intType,
         trays_sold $intType,
+        eggs_sold $intType,
         selling_price_per_tray $realType,
         delivery_cost $realType,
         employee_cost $realType,
@@ -175,7 +185,9 @@ class DatabaseHelper {
   Future<int> createPurchase(Purchase purchase) async {
     final db = await instance.database;
     return await db.transaction((txn) async {
-      final id = await txn.insert('purchases', purchase.toMap());
+      // Initialize remaining_eggs for FIFO tracking
+      final updatedPurchase = purchase.copyWith(remainingEggs: purchase.crates * 30);
+      final id = await txn.insert('purchases', updatedPurchase.toMap());
       
       // Update inventory
       final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
@@ -202,21 +214,70 @@ class DatabaseHelper {
   Future<int> createSale(Sale sale) async {
     final db = await instance.database;
     return await db.transaction((txn) async {
-      // Check inventory balance
+      // 1. Check inventory balance (in crates)
       final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
-      final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
+      final currentCrateBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
       
-      if (currentBalance < sale.cratesSold) {
+      if (currentCrateBalance < sale.cratesSold) {
         throw Exception('Insufficient inventory');
       }
 
-      final id = await txn.insert('sales', sale.toMap());
+      // 2. FIFO Logic to calculate True COGS and update remaining_eggs
+      int eggsToConsume = sale.totalEggsSold;
+      double totalCOGS = 0.0;
+
+      // Get all purchases with remaining stock, oldest first
+      final activePurchases = await txn.query(
+        'purchases',
+        where: 'remaining_eggs > 0',
+        orderBy: 'created_at ASC',
+      );
+
+      for (var row in activePurchases) {
+        if (eggsToConsume <= 0) break;
+
+        final purchase = Purchase.fromMap(row);
+        int available = purchase.remainingEggs;
+        int consumed = available < eggsToConsume ? available : eggsToConsume;
+
+        totalCOGS += consumed * purchase.pricePerEgg;
+        eggsToConsume -= consumed;
+
+        // Update purchase record
+        await txn.update(
+          'purchases',
+          {'remaining_eggs': available - consumed},
+          where: 'id = ?',
+          whereArgs: [purchase.id],
+        );
+      }
+
+      // 3. Fallback for edge cases (should not happen with balance check)
+      if (eggsToConsume > 0) {
+        final fallbackResult = await txn.query('purchases', orderBy: 'id DESC', limit: 1);
+        double fallbackPrice = fallbackResult.isNotEmpty 
+            ? Purchase.fromMap(fallbackResult.first).pricePerEgg 
+            : (sale.sellingPricePerCrate / 30);
+        totalCOGS += eggsToConsume * fallbackPrice;
+      }
+
+      // 4. Create the sale with the calculated COGS
+      final revenue = sale.totalRevenue;
+      final finalTotalCost = totalCOGS + sale.deliveryCost + sale.employeeCost;
+      final finalProfit = revenue - finalTotalCost;
+
+      final updatedSale = sale.copyWith(
+        totalCost: finalTotalCost,
+        profit: finalProfit,
+      );
+
+      final id = await txn.insert('sales', updatedSale.toMap());
       
-      // Update inventory
+      // 5. Update inventory (crate balance)
       await txn.insert('inventory', {
         'trays_in': 0,
         'trays_out': sale.cratesSold,
-        'balance': currentBalance - sale.cratesSold,
+        'balance': currentCrateBalance - sale.cratesSold,
         'created_at': sale.createdAt.toIso8601String(),
       });
       
@@ -255,6 +316,24 @@ class DatabaseHelper {
     return result.map((json) => Inventory.fromMap(json)).toList();
   }
 
+  // Metrics
+  Future<double> getInventoryValue() async {
+    final db = await instance.database;
+    final result = await db.query('purchases', where: 'remaining_eggs > 0');
+    double totalValue = 0;
+    for (var row in result) {
+      final p = Purchase.fromMap(row);
+      totalValue += p.remainingEggs * p.pricePerEgg;
+    }
+    return totalValue;
+  }
+
+  Future<double> getTotalCustomerDebt() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT SUM(balance_due) as total FROM sales');
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
   // Reports/Calculations
   Future<Map<String, double>> getTodaySummary() async {
     final db = await instance.database;
@@ -268,11 +347,17 @@ class DatabaseHelper {
     double balance = (salesResult.first['balance'] as num?)?.toDouble() ?? 0.0;
     double expenses = (expensesResult.first['total'] as num?)?.toDouble() ?? 0.0;
     
+    // Add inventory value and total debt to summary
+    final inventoryValue = await getInventoryValue();
+    final totalDebt = await getTotalCustomerDebt();
+
     return {
       'revenue': revenue,
       'profit': profit,
-      'balance': balance,
+      'balance': balance, // Today's new debt
       'expenses': expenses,
+      'inventory_value': inventoryValue,
+      'total_debt': totalDebt,
     };
   }
 

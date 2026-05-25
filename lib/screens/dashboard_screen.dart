@@ -45,7 +45,35 @@ class DashboardScreen extends ConsumerWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildSummaryCard(
-                    'Today\'s Profit',
+                    'Stock Value (Asset)',
+                    summaryAsync.when(
+                      data: (d) => '\$${d['inventory_value']?.toStringAsFixed(2)}',
+                      loading: () => '...',
+                      error: (e, s) => 'Error',
+                    ),
+                    Colors.teal,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSummaryCard(
+                    'Total Revenue',
+                    summaryAsync.when(
+                      data: (d) => '\$${d['revenue']?.toStringAsFixed(2)}',
+                      loading: () => '...',
+                      error: (e, s) => 'Error',
+                    ),
+                    Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildSummaryCard(
+                    'True Profit',
                     summaryAsync.when(
                       data: (d) => '\$${d['profit']?.toStringAsFixed(2)}',
                       loading: () => '...',
@@ -61,19 +89,19 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Expanded(
                   child: _buildSummaryCard(
-                    'Today\'s Sales',
+                    'Customer Debt',
                     summaryAsync.when(
-                      data: (d) => '\$${d['revenue']?.toStringAsFixed(2)}',
+                      data: (d) => '\$${d['total_debt']?.toStringAsFixed(2)}',
                       loading: () => '...',
                       error: (e, s) => 'Error',
                     ),
-                    Colors.orange,
+                    Colors.deepOrange,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: _buildSummaryCard(
-                    'Expenses',
+                    'Today\'s Exp.',
                     summaryAsync.when(
                       data: (d) => '\$${d['expenses']?.toStringAsFixed(2)}',
                       loading: () => '...',
