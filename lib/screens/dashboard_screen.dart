@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../widgets/quick_add_dialogs.dart';
 import 'suppliers_screen.dart';
 import 'customers_screen.dart';
 import 'purchase_screen.dart';
@@ -34,7 +35,7 @@ class DashboardScreen extends ConsumerWidget {
                   child: _buildSummaryCard(
                     'Stock',
                     inventoryAsync.when(
-                      data: (d) => '$d Trays',
+                      data: (d) => '$d Crates',
                       loading: () => '...',
                       error: (e, s) => 'Error',
                     ),
@@ -117,9 +118,33 @@ class DashboardScreen extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
+                  child: _buildLargeButton(
+                    context,
+                    'QUICK SUPPLIER',
+                    Icons.person_add,
+                    Colors.teal,
+                    () => QuickAddDialogs.showAddSupplierDialog(context, ref),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildLargeButton(
+                    context,
+                    'QUICK CUSTOMER',
+                    Icons.person_add_alt_1,
+                    Colors.indigo,
+                    () => QuickAddDialogs.showAddCustomerDialog(context, ref),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
                   child: _buildActionCard(
                     context,
-                    'Suppliers',
+                    'Suppliers List',
                     Icons.local_shipping,
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen())),
                   ),
@@ -128,7 +153,7 @@ class DashboardScreen extends ConsumerWidget {
                 Expanded(
                   child: _buildActionCard(
                     context,
-                    'Customers',
+                    'Customers List',
                     Icons.people,
                     () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen())),
                   ),

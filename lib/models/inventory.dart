@@ -1,14 +1,14 @@
 class Inventory {
   final int? id;
-  final int traysIn;
-  final int traysOut;
+  final int cratesIn;
+  final int cratesOut;
   final int balance;
   final DateTime createdAt;
 
   Inventory({
     this.id,
-    required this.traysIn,
-    required this.traysOut,
+    required this.cratesIn,
+    required this.cratesOut,
     required this.balance,
     required this.createdAt,
   });
@@ -16,8 +16,8 @@ class Inventory {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'trays_in': traysIn,
-      'trays_out': traysOut,
+      'trays_in': cratesIn,
+      'trays_out': cratesOut,
       'balance': balance,
       'created_at': createdAt.toIso8601String(),
     };
@@ -26,9 +26,9 @@ class Inventory {
   factory Inventory.fromMap(Map<String, dynamic> map) {
     return Inventory(
       id: map['id'],
-      traysIn: map['trays_in'],
-      traysOut: map['trays_out'],
-      balance: map['balance'],
+      cratesIn: map['trays_in'] as int,
+      cratesOut: map['trays_out'] as int,
+      balance: map['balance'] as int,
       createdAt: DateTime.parse(map['created_at']),
     );
   }

@@ -36,4 +36,22 @@ class Supplier {
       createdAt: DateTime.parse(map['created_at']),
     );
   }
+
+  Supplier copyWith({
+    int? id,
+    String? name,
+    String? phone,
+    String? location,
+    String? notes,
+    DateTime? createdAt,
+  }) {
+    return Supplier(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      location: location ?? this.location,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

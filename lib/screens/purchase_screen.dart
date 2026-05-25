@@ -15,13 +15,19 @@ class PurchaseScreen extends ConsumerStatefulWidget {
 }
 
 class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
-  final _traysController = TextEditingController();
+  final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
   final _transportController = TextEditingController(text: '0');
   final _otherController = TextEditingController(text: '0');
   final _notesController = TextEditingController();
+  
+  // Quick Add Supplier controllers
+  final _newNameController = TextEditingController();
+  final _newPhoneController = TextEditingController();
+  
   Supplier? _selectedSupplier;
   bool _isSaving = false;
+  bool _isQuickAddingSupplier = false;
 
   void _showAddPurchaseDialog() {
     // Start location fetch early
@@ -31,9 +37,10 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        final suppliersAsync = ref.watch(suppliersProvider);
         return StatefulBuilder(
           builder: (context, setState) {
+            final suppliersAsync = ref.watch(suppliersProvider);
+            
             return AlertDialog(
               title: const Text('New Purchase'),
               content: SingleChildScrollView(
@@ -41,17 +48,62 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     suppliersAsync.when(
-                      data: (list) => DropdownButtonFormField<Supplier>(
-                        decoration: const InputDecoration(labelText: 'Supplier'),
-                        initialValue: _selectedSupplier,
-                        items: list.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
-                        onChanged: _isSaving ? null : (val) => setState(() => _selectedSupplier = val),
-                      ),
+                      data: (list) {
+                        return Column(
+                          children: [
+                            DropdownButtonFormField<dynamic>(
+                              decoration: const InputDecoration(labelText: 'Supplier'),
+                              value: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
+                              items: [
+                                ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name))),
+                                const DropdownMenuItem(
+                                  value: 'ADD_NEW',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.add, color: Colors.green),
+                                      SizedBox(width: 8),
+                                      Text('Add New Supplier', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              onChanged: _isSaving ? null : (val) {
+                                if (val == 'ADD_NEW') {
+                                  setState(() {
+                                    _isQuickAddingSupplier = true;
+                                    _selectedSupplier = null;
+                                  });
+                                } else {
+                                  setState(() {
+                                    _isQuickAddingSupplier = false;
+                                    _selectedSupplier = val as Supplier;
+                                  });
+                                }
+                              },
+                            ),
+                            if (_isQuickAddingSupplier) ...[
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _newNameController,
+                                decoration: const InputDecoration(labelText: 'New Supplier Name', prefixIcon: Icon(Icons.person)),
+                                enabled: !_isSaving,
+                              ),
+                              TextField(
+                                controller: _newPhoneController,
+                                decoration: const InputDecoration(labelText: 'New Supplier Phone', prefixIcon: Icon(Icons.phone)),
+                                keyboardType: TextInputType.phone,
+                                enabled: !_isSaving,
+                              ),
+                              const Divider(),
+                            ],
+                          ],
+                        );
+                      },
                       loading: () => const CircularProgressIndicator(),
                       error: (e, s) => const Text('Error loading suppliers'),
                     ),
-                    TextField(controller: _traysController, decoration: const InputDecoration(labelText: 'Trays'), keyboardType: TextInputType.number, enabled: !_isSaving),
-                    TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Tray'), keyboardType: TextInputType.number, enabled: !_isSaving),
+                    TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates'), keyboardType: TextInputType.number, enabled: !_isSaving),
+                    TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _transportController, decoration: const InputDecoration(labelText: 'Transport Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _otherController, decoration: const InputDecoration(labelText: 'Other Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes'), enabled: !_isSaving),
@@ -65,59 +117,83 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: _isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: _isSaving ? null : () async {
-                final trays = int.tryParse(_traysController.text);
-                final price = double.tryParse(_priceController.text);
-                final transport = double.tryParse(_transportController.text) ?? 0.0;
-                final other = double.tryParse(_otherController.text) ?? 0.0;
-
-                if (_selectedSupplier == null || trays == null || price == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields correctly')));
-                  return;
-                }
-
-                setState(() => _isSaving = true);
-                try {
-                  final total = (trays * price) + transport + other;
-                  // Use the pre-fetched location
-                  final pos = await locationFuture;
-
-                  final purchase = Purchase(
-                    supplierId: _selectedSupplier!.id!,
-                    trays: trays,
-                    buyingPricePerTray: price,
-                    transportCost: transport,
-                    otherCost: other,
-                    totalCost: total,
-                    notes: _notesController.text,
-                    createdAt: DateTime.now(),
-                    latitude: pos?.latitude ?? 0.0,
-                    longitude: pos?.longitude ?? 0.0,
-                  );
-
-                  await DatabaseHelper.instance.createPurchase(purchase);
-                  ref.read(purchasesProvider.notifier).refresh();
-                  ref.invalidate(inventoryBalanceProvider);
-                  ref.invalidate(dashboardSummaryProvider);
-                  
-                  _traysController.clear();
-                  _priceController.clear();
-                  _transportController.text = '0';
-                  _otherController.text = '0';
-                  _notesController.clear();
-                  if (!context.mounted) return;
+                TextButton(onPressed: _isSaving ? null : () {
+                  _isQuickAddingSupplier = false;
+                  _selectedSupplier = null;
                   Navigator.pop(context);
-                } catch (e) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                } finally {
-                  if (context.mounted) setState(() => _isSaving = false);
-                }
-              },
-              child: const Text('Save'),
-            ),
+                }, child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: _isSaving ? null : () async {
+                    final cratesCount = int.tryParse(_cratesController.text);
+                    final price = double.tryParse(_priceController.text);
+                    final transport = double.tryParse(_transportController.text) ?? 0.0;
+                    final other = double.tryParse(_otherController.text) ?? 0.0;
+
+                    if ((!_isQuickAddingSupplier && _selectedSupplier == null) || 
+                        (_isQuickAddingSupplier && _newNameController.text.isEmpty) ||
+                        cratesCount == null || price == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields correctly')));
+                      return;
+                    }
+
+                    setState(() => _isSaving = true);
+                    try {
+                      // 1. Handle Quick Add Supplier if needed
+                      if (_isQuickAddingSupplier) {
+                        final newSupplier = Supplier(
+                          name: _newNameController.text,
+                          phone: _newPhoneController.text,
+                          location: '',
+                          notes: 'Quick added during purchase',
+                          createdAt: DateTime.now(),
+                        );
+                        final id = await DatabaseHelper.instance.createSupplier(newSupplier);
+                        _selectedSupplier = newSupplier.copyWith(id: id);
+                        await ref.read(suppliersProvider.notifier).refresh();
+                      }
+
+                      final total = (cratesCount * price) + transport + other;
+                      final pos = await locationFuture;
+
+                      final purchase = Purchase(
+                        supplierId: _selectedSupplier!.id!,
+                        crates: cratesCount,
+                        buyingPricePerCrate: price,
+                        transportCost: transport,
+                        otherCost: other,
+                        totalCost: total,
+                        notes: _notesController.text,
+                        createdAt: DateTime.now(),
+                        latitude: pos?.latitude ?? 0.0,
+                        longitude: pos?.longitude ?? 0.0,
+                      );
+
+                      await DatabaseHelper.instance.createPurchase(purchase);
+                      ref.read(purchasesProvider.notifier).refresh();
+                      ref.invalidate(inventoryBalanceProvider);
+                      ref.invalidate(dashboardSummaryProvider);
+                      
+                      _cratesController.clear();
+                      _priceController.clear();
+                      _transportController.text = '0';
+                      _otherController.text = '0';
+                      _notesController.clear();
+                      _newNameController.clear();
+                      _newPhoneController.clear();
+                      _isQuickAddingSupplier = false;
+                      _selectedSupplier = null;
+
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    } finally {
+                      if (context.mounted) setState(() => _isSaving = false);
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
               ],
             );
           },
@@ -160,7 +236,7 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                     child: Card(
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
-                        title: Text('${p.trays} Trays @ \$${p.buyingPricePerTray}'),
+                        title: Text('${p.crates} Crates @ \$${p.buyingPricePerCrate}'),
                         subtitle: Text('Total: \$${p.totalCost.toStringAsFixed(2)}\n${DateFormat('yyyy-MM-dd HH:mm').format(p.createdAt)}'),
                         isThreeLine: true,
                         trailing: const Icon(Icons.shopping_bag, color: Colors.green),

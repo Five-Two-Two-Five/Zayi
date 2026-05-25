@@ -182,9 +182,9 @@ class DatabaseHelper {
       final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
       
       await txn.insert('inventory', {
-        'trays_in': purchase.trays,
+        'trays_in': purchase.crates,
         'trays_out': 0,
-        'balance': currentBalance + purchase.trays,
+        'balance': currentBalance + purchase.crates,
         'created_at': purchase.createdAt.toIso8601String(),
       });
       
@@ -206,7 +206,7 @@ class DatabaseHelper {
       final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
       final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
       
-      if (currentBalance < sale.traysSold) {
+      if (currentBalance < sale.cratesSold) {
         throw Exception('Insufficient inventory');
       }
 
@@ -215,8 +215,8 @@ class DatabaseHelper {
       // Update inventory
       await txn.insert('inventory', {
         'trays_in': 0,
-        'trays_out': sale.traysSold,
-        'balance': currentBalance - sale.traysSold,
+        'trays_out': sale.cratesSold,
+        'balance': currentBalance - sale.cratesSold,
         'created_at': sale.createdAt.toIso8601String(),
       });
       
@@ -291,11 +291,11 @@ class DatabaseHelper {
   Future<int> deletePurchase(int purchaseId) async {
     final db = await instance.database;
     return await db.transaction((txn) async {
-      // Get the purchase to know how many trays to remove from inventory
+      // Get the purchase to know how many crates to remove from inventory
       final purchaseResult = await txn.query('purchases', where: 'id = ?', whereArgs: [purchaseId]);
       if (purchaseResult.isEmpty) return 0;
       
-      final trays = purchaseResult.first['trays'] as int;
+      final crates = purchaseResult.first['trays'] as int;
       
       // Delete the purchase
       final count = await txn.delete('purchases', where: 'id = ?', whereArgs: [purchaseId]);
@@ -306,8 +306,8 @@ class DatabaseHelper {
       
       await txn.insert('inventory', {
         'trays_in': 0,
-        'trays_out': trays,
-        'balance': currentBalance - trays,
+        'trays_out': crates,
+        'balance': currentBalance - crates,
         'created_at': DateTime.now().toIso8601String(),
       });
       
@@ -318,11 +318,11 @@ class DatabaseHelper {
   Future<int> deleteSale(int saleId) async {
     final db = await instance.database;
     return await db.transaction((txn) async {
-      // Get the sale to know how many trays to add back to inventory
+      // Get the sale to know how many crates to add back to inventory
       final saleResult = await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
       if (saleResult.isEmpty) return 0;
       
-      final trays = saleResult.first['trays_sold'] as int;
+      final crates = saleResult.first['trays_sold'] as int;
       
       // Delete the sale
       final count = await txn.delete('sales', where: 'id = ?', whereArgs: [saleId]);
@@ -332,9 +332,9 @@ class DatabaseHelper {
       final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
       
       await txn.insert('inventory', {
-        'trays_in': trays,
+        'trays_in': crates,
         'trays_out': 0,
-        'balance': currentBalance + trays,
+        'balance': currentBalance + crates,
         'created_at': DateTime.now().toIso8601String(),
       });
       

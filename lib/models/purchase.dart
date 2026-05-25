@@ -1,8 +1,8 @@
 class Purchase {
   final int? id;
   final int supplierId;
-  final int trays;
-  final double buyingPricePerTray;
+  final int crates;
+  final double buyingPricePerCrate;
   final double transportCost;
   final double otherCost;
   final double totalCost;
@@ -14,8 +14,8 @@ class Purchase {
   Purchase({
     this.id,
     required this.supplierId,
-    required this.trays,
-    required this.buyingPricePerTray,
+    required this.crates,
+    required this.buyingPricePerCrate,
     required this.transportCost,
     required this.otherCost,
     required this.totalCost,
@@ -29,8 +29,8 @@ class Purchase {
     return {
       'id': id,
       'supplier_id': supplierId,
-      'trays': trays,
-      'buying_price_per_tray': buyingPricePerTray,
+      'trays': crates,
+      'buying_price_per_tray': buyingPricePerCrate,
       'transport_cost': transportCost,
       'other_cost': otherCost,
       'total_cost': totalCost,
@@ -45,11 +45,11 @@ class Purchase {
     return Purchase(
       id: map['id'],
       supplierId: map['supplier_id'],
-      trays: map['trays'],
-      buyingPricePerTray: map['buying_price_per_tray'],
-      transportCost: map['transport_cost'],
-      otherCost: map['other_cost'],
-      totalCost: map['total_cost'],
+      crates: map['trays'],
+      buyingPricePerCrate: (map['buying_price_per_tray'] as num).toDouble(),
+      transportCost: (map['transport_cost'] as num).toDouble(),
+      otherCost: (map['other_cost'] as num).toDouble(),
+      totalCost: (map['total_cost'] as num).toDouble(),
       notes: map['notes'],
       createdAt: DateTime.parse(map['created_at']),
       latitude: map['latitude'],

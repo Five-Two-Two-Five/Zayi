@@ -1,10 +1,10 @@
 class Sale {
   final int? id;
   final int customerId;
-  final int traysSold;
-  final double sellingPricePerTray;
-  final double deliveryCost;
-  final double employeeCost;
+  final int cratesSold;
+  final double sellingPricePerCrate;
+  final double delivery_cost;
+  final double employee_cost;
   final double totalRevenue;
   final double totalCost;
   final double profit;
@@ -18,10 +18,10 @@ class Sale {
   Sale({
     this.id,
     required this.customerId,
-    required this.traysSold,
-    required this.sellingPricePerTray,
-    required this.deliveryCost,
-    required this.employeeCost,
+    required this.cratesSold,
+    required this.sellingPricePerCrate,
+    required this.delivery_cost,
+    required this.employee_cost,
     required this.totalRevenue,
     required this.totalCost,
     required this.profit,
@@ -37,10 +37,10 @@ class Sale {
     return {
       'id': id,
       'customer_id': customerId,
-      'trays_sold': traysSold,
-      'selling_price_per_tray': sellingPricePerTray,
-      'delivery_cost': deliveryCost,
-      'employee_cost': employeeCost,
+      'trays_sold': cratesSold,
+      'selling_price_per_tray': sellingPricePerCrate,
+      'delivery_cost': delivery_cost,
+      'employee_cost': employee_cost,
       'total_revenue': totalRevenue,
       'total_cost': totalCost,
       'profit': profit,
@@ -57,15 +57,15 @@ class Sale {
     return Sale(
       id: map['id'],
       customerId: map['customer_id'],
-      traysSold: map['trays_sold'],
-      sellingPricePerTray: map['selling_price_per_tray'],
-      deliveryCost: map['delivery_cost'],
-      employeeCost: map['employee_cost'],
-      totalRevenue: map['total_revenue'],
-      totalCost: map['total_cost'],
-      profit: map['profit'],
-      amountPaid: map['amount_paid'],
-      balanceDue: map['balance_due'],
+      cratesSold: map['trays_sold'],
+      sellingPricePerCrate: (map['selling_price_per_tray'] as num).toDouble(),
+      delivery_cost: (map['delivery_cost'] as num).toDouble(),
+      employee_cost: (map['employee_cost'] as num).toDouble(),
+      totalRevenue: (map['total_revenue'] as num).toDouble(),
+      totalCost: (map['total_cost'] as num).toDouble(),
+      profit: (map['profit'] as num).toDouble(),
+      amountPaid: (map['amount_paid'] as num).toDouble(),
+      balanceDue: (map['balance_due'] as num).toDouble(),
       notes: map['notes'],
       createdAt: DateTime.parse(map['created_at']),
       latitude: map['latitude'],
