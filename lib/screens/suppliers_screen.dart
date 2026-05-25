@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/supplier.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../widgets/quick_add_dialogs.dart';
@@ -36,10 +35,14 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
                     onDismissed: (direction) async {
-                      await DatabaseHelper.instance.deleteSupplier(supplier.id!);
+                      await DatabaseHelper.instance.deleteSupplier(
+                        supplier.id!,
+                      );
                       ref.read(suppliersProvider.notifier).refresh();
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Supplier deleted')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Supplier deleted')),
+                        );
                       }
                     },
                     child: ListTile(

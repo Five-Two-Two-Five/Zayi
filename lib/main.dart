@@ -13,11 +13,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   }
 
-  runApp(
-    const ProviderScope(
-      child: EggTraderApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: EggTraderApp()));
 }
 
 class EggTraderApp extends StatelessWidget {
@@ -32,14 +28,14 @@ class EggTraderApp extends StatelessWidget {
         primarySwatch: Colors.orange,
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.grey[100],
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

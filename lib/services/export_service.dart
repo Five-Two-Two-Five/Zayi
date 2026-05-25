@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../database/database_helper.dart';
@@ -22,7 +21,7 @@ class ExportService {
       rows.add(row.values.toList());
     }
 
-    String csvData = const ListToCsvConverter().convert(rows);
+    String csvData = _rowsToCsv(rows);
 
     final directory = await getApplicationDocumentsDirectory();
     final path = '${directory.path}/$tableName.csv';
@@ -30,7 +29,7 @@ class ExportService {
 
     await file.writeAsString(csvData);
     
-    await SharePlus.shareXFiles(
+    await Share.shareXFiles(
       [XFile(path)],
       text: 'Exported $tableName records',
     );
@@ -106,7 +105,7 @@ class ExportService {
     rows.sort((a, b) => (a[0] as String).compareTo(b[0] as String));
     rows.insert(0, header);
 
-    String csvData = const ListToCsvConverter().convert(rows);
+    String csvData = _rowsToCsv(rows);
 
     final directory = await getApplicationDocumentsDirectory();
     final path = '${directory.path}/Zayi_Financial_Time_Series.csv';
@@ -114,9 +113,13 @@ class ExportService {
 
     await file.writeAsString(csvData);
     
-    await SharePlus.shareXFiles(
+    await Share.shareXFiles(
       [XFile(path)],
       text: 'Zayi Master Financial Log for Time Series Analysis',
     );
+  }
+
+  static String _rowsToCsv(List<List<dynamic>> rows) {
+    return rows.map((row) => row.map((cell) => '"${cell.toString().replaceAll('"', '""')}"').join(',')).join('\n');
   }
 }

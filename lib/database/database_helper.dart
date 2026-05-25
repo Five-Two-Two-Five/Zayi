@@ -132,11 +132,17 @@ class DatabaseHelper {
         created_at $textType
       )
     ''');
-    
-    await db.execute('CREATE INDEX idx_inventory_created_at ON inventory(created_at)');
-    await db.execute('CREATE INDEX idx_purchases_created_at ON purchases(created_at)');
+
+    await db.execute(
+      'CREATE INDEX idx_inventory_created_at ON inventory(created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_purchases_created_at ON purchases(created_at)',
+    );
     await db.execute('CREATE INDEX idx_sales_created_at ON sales(created_at)');
-    await db.execute('CREATE INDEX idx_expenses_created_at ON expenses(created_at)');
+    await db.execute(
+      'CREATE INDEX idx_expenses_created_at ON expenses(created_at)',
+    );
   }
 
   // --- CRUD Operations ---
@@ -152,7 +158,7 @@ class DatabaseHelper {
     final result = await db.query('suppliers', orderBy: 'name ASC');
     return result.map((json) => Supplier.fromMap(json)).toList();
   }
-  
+
   Future<int> updateSupplier(Supplier supplier) async {
     final db = await instance.database;
     return await db.update(
@@ -174,7 +180,7 @@ class DatabaseHelper {
     final result = await db.query('customers', orderBy: 'name ASC');
     return result.map((json) => Customer.fromMap(json)).toList();
   }
-  
+
   Future<int> updateCustomer(Customer customer) async {
     final db = await instance.database;
     return await db.update(
@@ -190,20 +196,28 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.transaction((txn) async {
       // Initialize remaining_eggs for FIFO tracking
-      final updatedPurchase = purchase.copyWith(remainingEggs: purchase.crates * 30);
+      final updatedPurchase = purchase.copyWith(
+        remainingEggs: purchase.crates * 30,
+      );
       final id = await txn.insert('purchases', updatedPurchase.toMap());
-      
+
       // Update inventory
-      final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
-      final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
-      
+      final lastInventory = await txn.query(
+        'inventory',
+        orderBy: 'id DESC',
+        limit: 1,
+      );
+      final currentBalance = lastInventory.isNotEmpty
+          ? lastInventory.first['balance'] as int
+          : 0;
+
       await txn.insert('inventory', {
         'trays_in': purchase.crates,
         'trays_out': 0,
         'balance': currentBalance + purchase.crates,
         'created_at': purchase.createdAt.toIso8601String(),
       });
-      
+
       return id;
     });
   }
@@ -219,9 +233,15 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.transaction((txn) async {
       // 1. Check inventory balance (in crates)
-      final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
-      final currentCrateBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
-      
+      final lastInventory = await txn.query(
+        'inventory',
+        orderBy: 'id DESC',
+        limit: 1,
+      );
+      final currentCrateBalance = lastInventory.isNotEmpty
+          ? lastInventory.first['balance'] as int
+          : 0;
+
       if (currentCrateBalance < sale.cratesSold) {
         throw Exception('Insufficient inventory');
       }
@@ -258,9 +278,13 @@ class DatabaseHelper {
 
       // 3. Fallback for edge cases (should not happen with balance check)
       if (eggsToConsume > 0) {
-        final fallbackResult = await txn.query('purchases', orderBy: 'id DESC', limit: 1);
-        double fallbackPrice = fallbackResult.isNotEmpty 
-            ? Purchase.fromMap(fallbackResult.first).pricePerEgg 
+        final fallbackResult = await txn.query(
+          'purchases',
+          orderBy: 'id DESC',
+          limit: 1,
+        );
+        double fallbackPrice = fallbackResult.isNotEmpty
+            ? Purchase.fromMap(fallbackResult.first).pricePerEgg
             : (sale.sellingPricePerCrate / 30);
         totalCOGS += eggsToConsume * fallbackPrice;
       }
@@ -276,7 +300,7 @@ class DatabaseHelper {
       );
 
       final id = await txn.insert('sales', updatedSale.toMap());
-      
+
       // 5. Update inventory (crate balance)
       await txn.insert('inventory', {
         'trays_in': 0,
@@ -284,7 +308,7 @@ class DatabaseHelper {
         'balance': currentCrateBalance - sale.cratesSold,
         'created_at': sale.createdAt.toIso8601String(),
       });
-      
+
       return id;
     });
   }
@@ -313,7 +337,7 @@ class DatabaseHelper {
     final result = await db.query('inventory', orderBy: 'id DESC', limit: 1);
     return result.isNotEmpty ? result.first['balance'] as int : 0;
   }
-  
+
   Future<List<Inventory>> getInventoryHistory() async {
     final db = await instance.database;
     final result = await db.query('inventory', orderBy: 'created_at DESC');
@@ -334,14 +358,19 @@ class DatabaseHelper {
 
   Future<double> getTotalCustomerDebt() async {
     final db = await instance.database;
-    final result = await db.rawQuery('SELECT SUM(balance_due) as total FROM sales');
+    final result = await db.rawQuery(
+      'SELECT SUM(balance_due) as total FROM sales',
+    );
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   // Reports/Calculations
-  Future<Map<String, double>> getSummaryInRange(DateTime? start, DateTime? end) async {
+  Future<Map<String, double>> getSummaryInRange(
+    DateTime? start,
+    DateTime? end,
+  ) async {
     final db = await instance.database;
-    
+
     String dateFilter = '';
     if (start != null && end != null) {
       final sStr = start.toIso8601String().substring(0, 10);
@@ -351,15 +380,15 @@ class DatabaseHelper {
 
     final salesResult = await db.rawQuery(
       'SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance FROM sales '
-      '$dateFilter'
+      '$dateFilter',
     );
 
-    final expensesSql = dateFilter.isEmpty 
+    final expensesSql = dateFilter.isEmpty
         ? 'SELECT expense_type, SUM(amount) as total FROM expenses GROUP BY expense_type'
         : 'SELECT expense_type, SUM(amount) as total FROM expenses $dateFilter GROUP BY expense_type';
-    
+
     final expensesResult = await db.rawQuery(expensesSql);
-    
+
     double revenue = (salesResult.first['revenue'] as num?)?.toDouble() ?? 0.0;
     double profit = (salesResult.first['profit'] as num?)?.toDouble() ?? 0.0;
     double balance = (salesResult.first['balance'] as num?)?.toDouble() ?? 0.0;
@@ -371,9 +400,12 @@ class DatabaseHelper {
     for (var row in expensesResult) {
       final type = row['expense_type'] as String;
       final amt = (row['total'] as num?)?.toDouble() ?? 0.0;
-      if (type == 'Delivery') deliveryCosts += amt;
-      else if (type == 'Employee') employeeCosts += amt;
-      else otherExpenses += amt;
+      if (type == 'Delivery') {
+        deliveryCosts += amt;
+      } else if (type == 'Employee')
+        employeeCosts += amt;
+      else
+        otherExpenses += amt;
     }
 
     final inventoryValue = await getInventoryValue();
@@ -381,7 +413,11 @@ class DatabaseHelper {
 
     return {
       'revenue': revenue,
-      'gross_profit': profit + deliveryCosts + employeeCosts + otherExpenses, // Profit before overheads
+      'gross_profit':
+          profit +
+          deliveryCosts +
+          employeeCosts +
+          otherExpenses, // Profit before overheads
       'net_profit': profit - otherExpenses, // Final profit after all costs
       'delivery_costs': deliveryCosts,
       'employee_costs': employeeCosts,
@@ -413,25 +449,39 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.transaction((txn) async {
       // Get the purchase to know how many crates to remove from inventory
-      final purchaseResult = await txn.query('purchases', where: 'id = ?', whereArgs: [purchaseId]);
+      final purchaseResult = await txn.query(
+        'purchases',
+        where: 'id = ?',
+        whereArgs: [purchaseId],
+      );
       if (purchaseResult.isEmpty) return 0;
-      
+
       final crates = purchaseResult.first['trays'] as int;
-      
+
       // Delete the purchase
-      final count = await txn.delete('purchases', where: 'id = ?', whereArgs: [purchaseId]);
-      
+      final count = await txn.delete(
+        'purchases',
+        where: 'id = ?',
+        whereArgs: [purchaseId],
+      );
+
       // Update inventory (Reverse the purchase)
-      final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
-      final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
-      
+      final lastInventory = await txn.query(
+        'inventory',
+        orderBy: 'id DESC',
+        limit: 1,
+      );
+      final currentBalance = lastInventory.isNotEmpty
+          ? lastInventory.first['balance'] as int
+          : 0;
+
       await txn.insert('inventory', {
         'trays_in': 0,
         'trays_out': crates,
         'balance': currentBalance - crates,
         'created_at': DateTime.now().toIso8601String(),
       });
-      
+
       return count;
     });
   }
@@ -440,25 +490,39 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.transaction((txn) async {
       // Get the sale to know how many crates to add back to inventory
-      final saleResult = await txn.query('sales', where: 'id = ?', whereArgs: [saleId]);
+      final saleResult = await txn.query(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
       if (saleResult.isEmpty) return 0;
-      
+
       final crates = saleResult.first['trays_sold'] as int;
-      
+
       // Delete the sale
-      final count = await txn.delete('sales', where: 'id = ?', whereArgs: [saleId]);
-      
+      final count = await txn.delete(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
+
       // Update inventory (Reverse the sale)
-      final lastInventory = await txn.query('inventory', orderBy: 'id DESC', limit: 1);
-      final currentBalance = lastInventory.isNotEmpty ? lastInventory.first['balance'] as int : 0;
-      
+      final lastInventory = await txn.query(
+        'inventory',
+        orderBy: 'id DESC',
+        limit: 1,
+      );
+      final currentBalance = lastInventory.isNotEmpty
+          ? lastInventory.first['balance'] as int
+          : 0;
+
       await txn.insert('inventory', {
         'trays_in': crates,
         'trays_out': 0,
         'balance': currentBalance + crates,
         'created_at': DateTime.now().toIso8601String(),
       });
-      
+
       return count;
     });
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/customer.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../widgets/quick_add_dialogs.dart';
@@ -36,14 +35,21 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
                     onDismissed: (direction) async {
-                      await DatabaseHelper.instance.deleteCustomer(customer.id!);
+                      await DatabaseHelper.instance.deleteCustomer(
+                        customer.id!,
+                      );
                       ref.read(customersProvider.notifier).refresh();
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer deleted')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Customer deleted')),
+                        );
                       }
                     },
                     child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.person)),
+                      leading: const CircleAvatar(
+                        backgroundColor: Colors.orange,
+                        child: Icon(Icons.person),
+                      ),
                       title: Text(customer.name),
                       subtitle: Text(customer.phone),
                       trailing: const Icon(Icons.chevron_right),

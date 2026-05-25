@@ -8,6 +8,7 @@ import 'purchase_screen.dart';
 import 'sale_screen.dart';
 import 'expense_screen.dart';
 import 'reports_screen.dart';
+import '../features/receipts/presentation/pages/designer_page.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -201,6 +202,14 @@ class DashboardScreen extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
+              _buildLargeButton(
+                context,
+                'RECEIPT DESIGNER',
+                Icons.design_services,
+                Colors.deepPurple,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => DesignerPage())),
+              ),
+              const SizedBox(height: 12),
               _buildLargeButton(
                 context,
                 'NEW PURCHASE',
