@@ -35,7 +35,7 @@ class DashboardScreen extends ConsumerWidget {
                 initialDateRange: dateRange,
               );
               if (picked != null) {
-                ref.read(dashboardDateRangeProvider.notifier).state = picked;
+                ref.read(dashboardDateRangeProvider.notifier).update(picked);
               }
             },
           ),

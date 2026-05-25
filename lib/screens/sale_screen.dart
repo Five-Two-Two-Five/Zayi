@@ -5,6 +5,7 @@ import '../models/customer.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../services/location_service.dart';
+import 'package:intl/intl.dart';
 
 class SaleScreen extends ConsumerStatefulWidget {
   const SaleScreen({super.key});

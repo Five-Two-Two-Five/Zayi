@@ -25,14 +25,14 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
+    if (oldVersion < 4) {
       // For a "clean slate" as requested, we drop and recreate
       await db.execute('DROP TABLE IF EXISTS suppliers');
       await db.execute('DROP TABLE IF EXISTS customers');
@@ -40,7 +40,7 @@ class DatabaseHelper {
       await db.execute('DROP TABLE IF EXISTS sales');
       await db.execute('DROP TABLE IF EXISTS expenses');
       await db.execute('DROP TABLE IF EXISTS inventory');
-      await _createDB(db, 3);
+      await _createDB(db, 4);
     }
   }
 
@@ -49,6 +49,7 @@ class DatabaseHelper {
     const textType = 'TEXT NOT NULL';
     const intType = 'INTEGER NOT NULL';
     const realType = 'REAL NOT NULL';
+    const textTypeNullable = 'TEXT';
 
     await db.execute('''
       CREATE TABLE suppliers (
@@ -116,9 +117,9 @@ class DatabaseHelper {
         expense_type $textType,
         amount $realType,
         description $textType,
-        created_at $textType,
-        latitude $realType,
-        longitude $realType
+        employee_name $textTypeNullable,
+        extra_details $textTypeNullable,
+        created_at $textType
       )
     ''');
 

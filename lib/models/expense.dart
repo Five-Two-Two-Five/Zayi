@@ -3,6 +3,8 @@ class Expense {
   final String expenseType;
   final double amount;
   final String description;
+  final String? employeeName;
+  final String? extraDetails;
   final DateTime createdAt;
   final double latitude;
   final double longitude;
@@ -12,6 +14,8 @@ class Expense {
     required this.expenseType,
     required this.amount,
     required this.description,
+    this.employeeName,
+    this.extraDetails,
     required this.createdAt,
     required this.latitude,
     required this.longitude,
@@ -23,6 +27,8 @@ class Expense {
       'expense_type': expenseType,
       'amount': amount,
       'description': description,
+      'employee_name': employeeName,
+      'extra_details': extraDetails,
       'created_at': createdAt.toIso8601String(),
       'latitude': latitude,
       'longitude': longitude,
@@ -35,6 +41,8 @@ class Expense {
       expenseType: map['expense_type'],
       amount: map['amount'],
       description: map['description'],
+      employeeName: map['employee_name'],
+      extraDetails: map['extra_details'],
       createdAt: DateTime.parse(map['created_at']),
       latitude: map['latitude'],
       longitude: map['longitude'],

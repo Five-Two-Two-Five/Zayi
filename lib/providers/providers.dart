@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database_helper.dart';
 import '../models/supplier.dart';
@@ -97,12 +98,23 @@ final inventoryBalanceProvider = FutureProvider<int>((ref) async {
 });
 
 // Dashboard Filters
-final dashboardDateRangeProvider = StateProvider<DateTimeRange>((ref) {
-  final now = DateTime.now();
-  return DateTimeRange(
-    start: DateTime(now.year, now.month, now.day),
-    end: DateTime(now.year, now.month, now.day),
-  );
+class DashboardDateRangeNotifier extends Notifier<DateTimeRange> {
+  @override
+  DateTimeRange build() {
+    final now = DateTime.now();
+    return DateTimeRange(
+      start: DateTime(now.year, now.month, now.day),
+      end: DateTime(now.year, now.month, now.day),
+    );
+  }
+
+  void update(DateTimeRange range) {
+    state = range;
+  }
+}
+
+final dashboardDateRangeProvider = NotifierProvider<DashboardDateRangeNotifier, DateTimeRange>(() {
+  return DashboardDateRangeNotifier();
 });
 
 // Dashboard Summary Provider
