@@ -16,8 +16,6 @@ class SaleScreen extends ConsumerStatefulWidget {
 class _SaleScreenState extends ConsumerState<SaleScreen> {
   final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
-  final _deliveryController = TextEditingController(text: '0');
-  final _employeeController = TextEditingController(text: '0');
   final _paidController = TextEditingController();
   final _notesController = TextEditingController();
   
@@ -26,6 +24,7 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
   final _newPhoneController = TextEditingController();
   
   Customer? _selectedCustomer;
+  DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
   bool _isQuickAddingCustomer = false;
 
@@ -47,6 +46,21 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ListTile(
+                      title: Text('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2023),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDate = picked);
+                        }
+                      },
+                    ),
                     customersAsync.when(
                       data: (list) {
                         return Column(
@@ -104,8 +118,6 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                     ),
                     TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates Sold'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate'), keyboardType: TextInputType.number, enabled: !_isSaving),
-                    TextField(controller: _deliveryController, decoration: const InputDecoration(labelText: 'Delivery Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
-                    TextField(controller: _employeeController, decoration: const InputDecoration(labelText: 'Employee Cost'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _paidController, decoration: const InputDecoration(labelText: 'Amount Paid'), keyboardType: TextInputType.number, enabled: !_isSaving),
                     TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes'), enabled: !_isSaving),
                     if (_isSaving) ...[
@@ -127,8 +139,6 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                   onPressed: _isSaving ? null : () async {
                     final cratesCount = int.tryParse(_cratesController.text);
                     final price = double.tryParse(_priceController.text);
-                    final delivery = double.tryParse(_deliveryController.text) ?? 0.0;
-                    final employee = double.tryParse(_employeeController.text) ?? 0.0;
                     final paid = double.tryParse(_paidController.text.isEmpty ? '0' : _paidController.text) ?? 0.0;
 
                     if ((!_isQuickAddingCustomer && _selectedCustomer == null) || 
@@ -155,32 +165,22 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                       }
 
                       final revenue = cratesCount * price;
-                      
-                      double buyingPrice = 0.0;
-                      final purchases = await DatabaseHelper.instance.getAllPurchases();
-                      if (purchases.isNotEmpty) {
-                        buyingPrice = purchases.first.buyingPricePerCrate;
-                      }
-
-                      final totalCost = (cratesCount * buyingPrice) + delivery + employee;
-                      final profit = revenue - totalCost;
-                      final balance = revenue - paid;
-
                       final pos = await locationFuture;
 
                       final sale = Sale(
                         customerId: _selectedCustomer!.id!,
                         cratesSold: cratesCount,
+                        eggsSold: 0, 
                         sellingPricePerCrate: price,
-                        deliveryCost: delivery,
-                        employeeCost: employee,
+                        deliveryCost: 0,
+                        employeeCost: 0,
                         totalRevenue: revenue,
-                        totalCost: totalCost,
-                        profit: profit,
+                        totalCost: 0, // Calculated by FIFO in DB helper
+                        profit: 0,    // Calculated by FIFO in DB helper
                         amountPaid: paid,
-                        balanceDue: balance,
+                        balanceDue: revenue - paid,
                         notes: _notesController.text,
-                        createdAt: DateTime.now(),
+                        createdAt: _selectedDate,
                         latitude: pos?.latitude ?? 0.0,
                         longitude: pos?.longitude ?? 0.0,
                       );
@@ -192,14 +192,13 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
 
                       _cratesController.clear();
                       _priceController.clear();
-                      _deliveryController.text = '0';
-                      _employeeController.text = '0';
                       _paidController.clear();
                       _notesController.clear();
                       _newNameController.clear();
                       _newPhoneController.clear();
                       _isQuickAddingCustomer = false;
                       _selectedCustomer = null;
+                      _selectedDate = DateTime.now();
 
                       if (!context.mounted) return;
                       Navigator.pop(context);

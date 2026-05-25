@@ -16,14 +16,13 @@ class ExpenseScreen extends ConsumerStatefulWidget {
 class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
-  String _selectedType = 'Fuel';
-  final List<String> _expenseTypes = ['Fuel', 'Repairs', 'Salaries', 'Miscellaneous'];
+  String _selectedType = 'General';
+  DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
 
-  void _showAddExpenseDialog() {
-    // Start location fetch early
-    final locationFuture = LocationService.getCurrentLocation();
+  final List<String> _expenseTypes = ['General', 'Delivery', 'Employee'];
 
+  void _showAddExpenseDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -34,19 +33,41 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedType,
-                  items: _expenseTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                  onChanged: _isSaving ? null : (val) => setState(() => _selectedType = val!),
-                  decoration: const InputDecoration(labelText: 'Expense Type'),
+                ListTile(
+                  title: Text('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}'),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
                 ),
-                TextField(controller: _amountController, decoration: const InputDecoration(labelText: 'Amount'), keyboardType: TextInputType.number, enabled: !_isSaving),
-                TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Description'), enabled: !_isSaving),
+                DropdownButtonFormField<String>(
+                  value: _selectedType,
+                  decoration: const InputDecoration(labelText: 'Expense Type'),
+                  items: _expenseTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  onChanged: (val) => setState(() => _selectedType = val!),
+                ),
+                TextField(
+                  controller: _amountController,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                  keyboardType: TextInputType.number,
+                  enabled: !_isSaving,
+                ),
+                TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(labelText: 'Description (Optional)'),
+                  enabled: !_isSaving,
+                ),
                 if (_isSaving) ...[
                   const SizedBox(height: 20),
                   const CircularProgressIndicator(),
-                  const SizedBox(height: 8),
-                  const Text('Saving...'),
                 ],
               ],
             ),
@@ -55,30 +76,28 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
             TextButton(onPressed: _isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: _isSaving ? null : () async {
-                final amount = double.tryParse(_amountController.text);
-                if (amount == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid amount')));
-                  return;
-                }
-                
+                final amt = double.tryParse(_amountController.text);
+                if (amt == null) return;
+
                 setState(() => _isSaving = true);
                 try {
-                  // Use pre-fetched location
-                  final pos = await locationFuture;
                   final expense = Expense(
                     expenseType: _selectedType,
-                    amount: amount,
+                    amount: amt,
                     description: _descriptionController.text,
-                    createdAt: DateTime.now(),
-                    latitude: pos?.latitude ?? 0.0,
-                    longitude: pos?.longitude ?? 0.0,
+                    createdAt: _selectedDate,
+                    latitude: 0.0,
+                    longitude: 0.0,
                   );
+
                   await DatabaseHelper.instance.createExpense(expense);
                   ref.read(expensesProvider.notifier).refresh();
                   ref.invalidate(dashboardSummaryProvider);
-                  
+
                   _amountController.clear();
                   _descriptionController.clear();
+                  _selectedDate = DateTime.now();
+
                   if (!context.mounted) return;
                   Navigator.pop(context);
                 } catch (e) {
@@ -122,15 +141,18 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                       await DatabaseHelper.instance.deleteExpense(e.id!);
                       ref.read(expensesProvider.notifier).refresh();
                       ref.invalidate(dashboardSummaryProvider);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Expense deleted')));
-                      }
                     },
-                    child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: Colors.red, child: Icon(Icons.money_off)),
-                      title: Text('${e.expenseType}: \$${e.amount}'),
-                      subtitle: Text('${e.description}\n${DateFormat('yyyy-MM-dd HH:mm').format(e.createdAt)}'),
-                      isThreeLine: true,
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _getColorForType(e.expenseType),
+                          child: const Icon(Icons.money_off, color: Colors.white),
+                        ),
+                        title: Text('${e.expenseType}: \$${e.amount.toStringAsFixed(2)}'),
+                        subtitle: Text('${e.description}\n${DateFormat('yyyy-MM-dd').format(e.createdAt)}'),
+                        isThreeLine: true,
+                      ),
                     ),
                   );
                 },
@@ -144,5 +166,13 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  Color _getColorForType(String type) {
+    switch (type) {
+      case 'Delivery': return Colors.indigo;
+      case 'Employee': return Colors.deepPurple;
+      default: return Colors.red;
+    }
   }
 }

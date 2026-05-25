@@ -25,16 +25,22 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE purchases ADD COLUMN remaining_eggs INTEGER NOT NULL DEFAULT 0');
-      await db.execute('ALTER TABLE sales ADD COLUMN eggs_sold INTEGER NOT NULL DEFAULT 0');
+    if (oldVersion < 3) {
+      // For a "clean slate" as requested, we drop and recreate
+      await db.execute('DROP TABLE IF EXISTS suppliers');
+      await db.execute('DROP TABLE IF EXISTS customers');
+      await db.execute('DROP TABLE IF EXISTS purchases');
+      await db.execute('DROP TABLE IF EXISTS sales');
+      await db.execute('DROP TABLE IF EXISTS expenses');
+      await db.execute('DROP TABLE IF EXISTS inventory');
+      await _createDB(db, 3);
     }
   }
 
@@ -91,8 +97,6 @@ class DatabaseHelper {
         trays_sold $intType,
         eggs_sold $intType,
         selling_price_per_tray $realType,
-        delivery_cost $realType,
-        employee_cost $realType,
         total_revenue $realType,
         total_cost $realType,
         profit $realType,
@@ -128,8 +132,7 @@ class DatabaseHelper {
       )
     ''');
     
-    // Initial inventory balance
-    await db.execute('CREATE INDEX idx_inventory_id ON inventory(id)');
+    await db.execute('CREATE INDEX idx_inventory_created_at ON inventory(created_at)');
     await db.execute('CREATE INDEX idx_purchases_created_at ON purchases(created_at)');
     await db.execute('CREATE INDEX idx_sales_created_at ON sales(created_at)');
     await db.execute('CREATE INDEX idx_expenses_created_at ON expenses(created_at)');
@@ -335,30 +338,57 @@ class DatabaseHelper {
   }
 
   // Reports/Calculations
-  Future<Map<String, double>> getTodaySummary() async {
+  Future<Map<String, double>> getSummaryInRange(DateTime start, DateTime end) async {
     final db = await instance.database;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final sStr = start.toIso8601String().substring(0, 10);
+    final eStr = end.toIso8601String().substring(0, 10);
+
+    final salesResult = await db.rawQuery(
+      'SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance FROM sales '
+      'WHERE date(created_at) BETWEEN "$sStr" AND "$eStr"'
+    );
     
-    final salesResult = await db.rawQuery('SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance FROM sales WHERE created_at LIKE "$today%"');
-    final expensesResult = await db.rawQuery('SELECT SUM(amount) as total FROM expenses WHERE created_at LIKE "$today%"');
+    final expensesResult = await db.rawQuery(
+      'SELECT expense_type, SUM(amount) as total FROM expenses '
+      'WHERE date(created_at) BETWEEN "$sStr" AND "$eStr" '
+      'GROUP BY expense_type'
+    );
     
     double revenue = (salesResult.first['revenue'] as num?)?.toDouble() ?? 0.0;
     double profit = (salesResult.first['profit'] as num?)?.toDouble() ?? 0.0;
     double balance = (salesResult.first['balance'] as num?)?.toDouble() ?? 0.0;
-    double expenses = (expensesResult.first['total'] as num?)?.toDouble() ?? 0.0;
-    
-    // Add inventory value and total debt to summary
+
+    double deliveryCosts = 0.0;
+    double employeeCosts = 0.0;
+    double otherExpenses = 0.0;
+
+    for (var row in expensesResult) {
+      final type = row['expense_type'] as String;
+      final amt = (row['total'] as num?)?.toDouble() ?? 0.0;
+      if (type == 'Delivery') deliveryCosts += amt;
+      else if (type == 'Employee') employeeCosts += amt;
+      else otherExpenses += amt;
+    }
+
     final inventoryValue = await getInventoryValue();
     final totalDebt = await getTotalCustomerDebt();
 
     return {
       'revenue': revenue,
-      'profit': profit,
-      'balance': balance, // Today's new debt
-      'expenses': expenses,
+      'gross_profit': profit + deliveryCosts + employeeCosts + otherExpenses, // Profit before overheads
+      'net_profit': profit - otherExpenses, // Final profit after all costs
+      'delivery_costs': deliveryCosts,
+      'employee_costs': employeeCosts,
+      'other_expenses': otherExpenses,
       'inventory_value': inventoryValue,
       'total_debt': totalDebt,
+      'new_debt': balance,
     };
+  }
+
+  Future<Map<String, double>> getTodaySummary() async {
+    final now = DateTime.now();
+    return await getSummaryInRange(now, now);
   }
 
   // --- Delete Operations ---

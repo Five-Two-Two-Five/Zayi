@@ -26,6 +26,7 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   final _newPhoneController = TextEditingController();
   
   Supplier? _selectedSupplier;
+  DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
   bool _isQuickAddingSupplier = false;
 
@@ -47,6 +48,21 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ListTile(
+                      title: Text('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2023),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDate = picked);
+                        }
+                      },
+                    ),
                     suppliersAsync.when(
                       data: (list) {
                         return Column(
@@ -158,12 +174,13 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                       final purchase = Purchase(
                         supplierId: _selectedSupplier!.id!,
                         crates: cratesCount,
+                        remainingEggs: cratesCount * 30, // Default to 30 eggs/crate
                         buyingPricePerCrate: price,
                         transportCost: transport,
                         otherCost: other,
                         totalCost: total,
                         notes: _notesController.text,
-                        createdAt: DateTime.now(),
+                        createdAt: _selectedDate,
                         latitude: pos?.latitude ?? 0.0,
                         longitude: pos?.longitude ?? 0.0,
                       );
@@ -182,6 +199,7 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                       _newPhoneController.clear();
                       _isQuickAddingSupplier = false;
                       _selectedSupplier = null;
+                      _selectedDate = DateTime.now();
 
                       if (!context.mounted) return;
                       Navigator.pop(context);

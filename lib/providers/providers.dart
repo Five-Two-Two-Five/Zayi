@@ -96,7 +96,17 @@ final inventoryBalanceProvider = FutureProvider<int>((ref) async {
   return await DatabaseHelper.instance.getInventoryBalance();
 });
 
+// Dashboard Filters
+final dashboardDateRangeProvider = StateProvider<DateTimeRange>((ref) {
+  final now = DateTime.now();
+  return DateTimeRange(
+    start: DateTime(now.year, now.month, now.day),
+    end: DateTime(now.year, now.month, now.day),
+  );
+});
+
 // Dashboard Summary Provider
 final dashboardSummaryProvider = FutureProvider<Map<String, double>>((ref) async {
-  return await DatabaseHelper.instance.getTodaySummary();
+  final range = ref.watch(dashboardDateRangeProvider);
+  return await DatabaseHelper.instance.getSummaryInRange(range.start, range.end);
 });
