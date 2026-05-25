@@ -98,27 +98,48 @@ final inventoryBalanceProvider = FutureProvider<int>((ref) async {
 });
 
 // Dashboard Filters
-class DashboardDateRangeNotifier extends Notifier<DateTimeRange> {
+class DashboardDateRangeNotifier extends Notifier<DateTimeRange?> {
   @override
-  DateTimeRange build() {
+  DateTimeRange? build() {
     final now = DateTime.now();
+    // Default to Today
     return DateTimeRange(
       start: DateTime(now.year, now.month, now.day),
       end: DateTime(now.year, now.month, now.day),
     );
   }
 
-  void update(DateTimeRange range) {
+  void update(DateTimeRange? range) {
     state = range;
+  }
+
+  void setToday() {
+    final now = DateTime.now();
+    state = DateTimeRange(
+      start: DateTime(now.year, now.month, now.day),
+      end: DateTime(now.year, now.month, now.day),
+    );
+  }
+
+  void setThisMonth() {
+    final now = DateTime.now();
+    state = DateTimeRange(
+      start: DateTime(now.year, now.month, 1),
+      end: DateTime(now.year, now.month, now.day),
+    );
+  }
+
+  void setAllTime() {
+    state = null;
   }
 }
 
-final dashboardDateRangeProvider = NotifierProvider<DashboardDateRangeNotifier, DateTimeRange>(() {
+final dashboardDateRangeProvider = NotifierProvider<DashboardDateRangeNotifier, DateTimeRange?>(() {
   return DashboardDateRangeNotifier();
 });
 
 // Dashboard Summary Provider
 final dashboardSummaryProvider = FutureProvider<Map<String, double>>((ref) async {
   final range = ref.watch(dashboardDateRangeProvider);
-  return await DatabaseHelper.instance.getSummaryInRange(range.start, range.end);
+  return await DatabaseHelper.instance.getSummaryInRange(range?.start, range?.end);
 });

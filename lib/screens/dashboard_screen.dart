@@ -25,19 +25,39 @@ class DashboardScreen extends ConsumerWidget {
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2023),
-                lastDate: DateTime(2030),
-                initialDateRange: dateRange,
-              );
-              if (picked != null) {
-                ref.read(dashboardDateRangeProvider.notifier).update(picked);
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (value) async {
+              final notifier = ref.read(dashboardDateRangeProvider.notifier);
+              switch (value) {
+                case 'today':
+                  notifier.setToday();
+                  break;
+                case 'month':
+                  notifier.setThisMonth();
+                  break;
+                case 'all':
+                  notifier.setAllTime();
+                  break;
+                case 'custom':
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2023),
+                    lastDate: DateTime(2030),
+                    initialDateRange: dateRange,
+                  );
+                  if (picked != null) {
+                    notifier.update(picked);
+                  }
+                  break;
               }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'today', child: Text('Today')),
+              const PopupMenuItem(value: 'month', child: Text('This Month')),
+              const PopupMenuItem(value: 'all', child: Text('All Time')),
+              const PopupMenuItem(value: 'custom', child: Text('Custom Range...')),
+            ],
           ),
         ],
       ),
@@ -52,7 +72,9 @@ class DashboardScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Period: ${DateFormat('MMM dd').format(dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(dateRange.end)}',
+                dateRange == null 
+                    ? 'Period: All Time' 
+                    : 'Period: ${DateFormat('MMM dd').format(dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(dateRange.end)}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),

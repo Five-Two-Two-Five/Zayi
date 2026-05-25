@@ -339,21 +339,26 @@ class DatabaseHelper {
   }
 
   // Reports/Calculations
-  Future<Map<String, double>> getSummaryInRange(DateTime start, DateTime end) async {
+  Future<Map<String, double>> getSummaryInRange(DateTime? start, DateTime? end) async {
     final db = await instance.database;
-    final sStr = start.toIso8601String().substring(0, 10);
-    final eStr = end.toIso8601String().substring(0, 10);
+    
+    String dateFilter = '';
+    if (start != null && end != null) {
+      final sStr = start.toIso8601String().substring(0, 10);
+      final eStr = end.toIso8601String().substring(0, 10);
+      dateFilter = 'WHERE date(created_at) BETWEEN "$sStr" AND "$eStr"';
+    }
 
     final salesResult = await db.rawQuery(
       'SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance FROM sales '
-      'WHERE date(created_at) BETWEEN "$sStr" AND "$eStr"'
+      '$dateFilter'
     );
+
+    final expensesSql = dateFilter.isEmpty 
+        ? 'SELECT expense_type, SUM(amount) as total FROM expenses GROUP BY expense_type'
+        : 'SELECT expense_type, SUM(amount) as total FROM expenses $dateFilter GROUP BY expense_type';
     
-    final expensesResult = await db.rawQuery(
-      'SELECT expense_type, SUM(amount) as total FROM expenses '
-      'WHERE date(created_at) BETWEEN "$sStr" AND "$eStr" '
-      'GROUP BY expense_type'
-    );
+    final expensesResult = await db.rawQuery(expensesSql);
     
     double revenue = (salesResult.first['revenue'] as num?)?.toDouble() ?? 0.0;
     double profit = (salesResult.first['profit'] as num?)?.toDouble() ?? 0.0;
