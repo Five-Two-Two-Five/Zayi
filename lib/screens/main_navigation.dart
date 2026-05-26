@@ -3,7 +3,7 @@ import 'dashboard_screen.dart';
 import 'sale_screen.dart';
 import 'purchase_screen.dart';
 import 'reports_screen.dart';
-import 'assets_screen.dart';
+import 'management_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -16,10 +16,10 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    DashboardScreen(),
+    const DashboardScreen(),
     const SaleScreen(),
     const PurchaseScreen(),
-    const AssetsScreen(),
+    const ManagementScreen(),
     const ReportsScreen(),
   ];
 
@@ -35,11 +35,14 @@ class _MainNavigationState extends State<MainNavigation> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: true,
+        selectedFontSize: 12,
+        unselectedFontSize: 10,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.sell), label: 'Sales'),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Purchases'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Assets'),
+          BottomNavigationBarItem(icon: Icon(Icons.manage_accounts), label: 'Management'),
           BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'Reports'),
         ],
         currentIndex: _selectedIndex,

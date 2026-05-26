@@ -5,6 +5,7 @@ class ReceiptSettings {
   final String phone;
   final String email;
   final String footerNote;
+  final double defaultTaxRate;
 
   ReceiptSettings({
     required this.businessName,
@@ -13,9 +14,10 @@ class ReceiptSettings {
     required this.phone,
     required this.email,
     required this.footerNote,
+    required this.defaultTaxRate,
   });
 
-  Map<String, String> toMap() {
+  Map<String, dynamic> toMap() {
     return {
       'business_name': businessName,
       'address': address,
@@ -23,6 +25,7 @@ class ReceiptSettings {
       'phone': phone,
       'email': email,
       'footer_note': footerNote,
+      'default_tax_rate': defaultTaxRate,
     };
   }
 
@@ -34,6 +37,7 @@ class ReceiptSettings {
       phone: map['phone'] ?? '',
       email: map['email'] ?? '',
       footerNote: map['footer_note'] ?? 'Thank you for your business!',
+      defaultTaxRate: (map['default_tax_rate'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -44,6 +48,7 @@ class ReceiptSettings {
     String? phone,
     String? email,
     String? footerNote,
+    double? defaultTaxRate,
   }) {
     return ReceiptSettings(
       businessName: businessName ?? this.businessName,
@@ -52,6 +57,7 @@ class ReceiptSettings {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       footerNote: footerNote ?? this.footerNote,
+      defaultTaxRate: defaultTaxRate ?? this.defaultTaxRate,
     );
   }
 }

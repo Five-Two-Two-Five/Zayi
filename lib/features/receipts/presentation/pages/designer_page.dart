@@ -79,6 +79,14 @@ class _DesignerPageState extends ConsumerState<DesignerPage> {
                   ),
                 ],
               ),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                "Read-only mode: Business details are locked to the settings configuration.",
+                style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+              ),
             ),
           // Bottom Panel: Live Preview
           Expanded(
@@ -116,22 +124,6 @@ class _DesignerPageState extends ConsumerState<DesignerPage> {
                     ),
                     loading: () => const Center(child: CircularProgressIndicator()),
                     error: (e, s) => Center(child: Text('Error loading settings: $e')),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.share),
-                        label: const Text("Share"),
-                        onPressed: () async {
-                           // PDF is shared directly from PdfPreview, 
-                           // but we can add custom sharing if needed.
-                        },
-                      ),
-                    ],
                   ),
                 ),
               ],

@@ -18,6 +18,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _footerController = TextEditingController();
+  final _taxRateController = TextEditingController();
 
   bool _isInitialized = false;
 
@@ -29,6 +30,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _footerController.dispose();
+    _taxRateController.dispose();
     super.dispose();
   }
 
@@ -40,6 +42,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
     _phoneController.text = settings.phone;
     _emailController.text = settings.email;
     _footerController.text = settings.footerNote;
+    _taxRateController.text = settings.defaultTaxRate.toString();
     _isInitialized = true;
   }
 
@@ -65,13 +68,14 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
                 phone: _phoneController.text,
                 email: _emailController.text,
                 footerNote: _footerController.text,
+                defaultTaxRate: double.tryParse(_taxRateController.text) ?? 0.0,
               );
               await ref.read(receiptSettingsProvider.notifier).updateSettings(newSettings);
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Receipt settings saved')),
               );
-              if (mounted) Navigator.pop(context);
+              Navigator.pop(context);
             },
           ),
         ],
@@ -97,6 +101,8 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
                 _buildTextField(_phoneController, 'Phone Number', Icons.phone, keyboardType: TextInputType.phone),
                 const SizedBox(height: 12),
                 _buildTextField(_emailController, 'Email Address', Icons.email, keyboardType: TextInputType.emailAddress),
+                const SizedBox(height: 12),
+                _buildTextField(_taxRateController, 'Default Tax Rate (%)', Icons.percent, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
                 const SizedBox(height: 24),
                 const Text('FOOTER', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
                 const SizedBox(height: 16),

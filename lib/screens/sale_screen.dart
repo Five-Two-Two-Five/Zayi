@@ -8,6 +8,7 @@ import '../services/location_service.dart';
 import 'package:intl/intl.dart';
 import '../features/receipts/services/receipt_mapper.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
+import 'sale_history_screen.dart';
 import '../theme/insta_theme.dart';
 import '../widgets/full_page_add_dialog.dart';
 
@@ -123,6 +124,15 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
                       elevation: 0,
                       child: ListTile(
+                        onTap: () {
+                          // Fetch customer for history screen
+                          final customer = ref.read(customersProvider).when(
+                            data: (list) => list.firstWhere((c) => c.id == s.customerId, orElse: () => Customer(id: s.customerId, name: 'Unknown', phone: '', location: '', notes: '', createdAt: DateTime.now())),
+                            error: (_, __) => Customer(id: s.customerId, name: 'Unknown', phone: '', location: '', notes: '', createdAt: DateTime.now()),
+                            loading: () => Customer(id: s.customerId, name: 'Unknown', phone: '', location: '', notes: '', createdAt: DateTime.now()),
+                          );
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => SaleHistoryScreen(sale: s, customer: customer)));
+                        },
                         title: Text(
                           '${s.cratesSold} Crates @ \$${s.sellingPricePerCrate}',
                           style: const TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold),
@@ -347,8 +357,8 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
             loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
             error: (e, s) => const Text('Error loading customers', style: TextStyle(color: Colors.red)),
           ),
-          TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates Sold', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
-          TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates Sold *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _taxRateController, decoration: const InputDecoration(labelText: 'Tax Rate (%)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _paidController, decoration: const InputDecoration(labelText: 'Amount Paid', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),

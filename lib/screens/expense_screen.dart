@@ -4,6 +4,7 @@ import '../models/expense.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import 'package:intl/intl.dart';
+import '../features/receipts/presentation/pages/designer_page.dart';
 import '../theme/insta_theme.dart';
 import '../widgets/full_page_add_dialog.dart';
 
@@ -85,6 +86,45 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                           style: const TextStyle(color: InstaPalette.textSecondary),
                         ),
                         isThreeLine: true,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.print, color: InstaPalette.accent),
+                          onPressed: () async {
+                            final settings = await ref.read(receiptSettingsProvider.future);
+                            
+                            final receiptData = {
+                              'receiptNumber': 'EXP-${e.id}',
+                              'issuer': settings.businessName,
+                              'address': settings.address,
+                              'taxId': settings.taxId,
+                              'phone': settings.phone,
+                              'customerName': e.employeeName ?? 'N/A', // Using employee/description as context
+                              'date': DateFormat('yyyy-MM-dd hh:mm a').format(e.createdAt),
+                              'items': [
+                                {
+                                  'name': 'Expense: ${e.expenseType} - ${e.description}',
+                                  'qty': 1,
+                                  'total': e.amount.toStringAsFixed(2),
+                                },
+                              ],
+                              'subTotal': e.amount.toStringAsFixed(2),
+                              'total': e.amount.toStringAsFixed(2),
+                              'cash': e.amount.toStringAsFixed(2),
+                              'balance': '0.00',
+                              'footer': settings.footerNote,
+                            };
+
+                            if (!context.mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DesignerPage(
+                                  transactionData: receiptData,
+                                  isReadOnly: true,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   );

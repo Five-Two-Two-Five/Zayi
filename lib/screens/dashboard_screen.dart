@@ -3,15 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/insta_theme.dart';
 import '../providers/providers.dart';
 import '../widgets/quick_add_dialogs.dart';
-import 'suppliers_screen.dart';
-import 'customers_screen.dart';
 import 'purchase_screen.dart';
 import 'sale_screen.dart';
 import 'expense_screen.dart';
-import 'reports_screen.dart';
 import 'inventory_breakdown_screen.dart';
-import '../features/receipts/presentation/pages/designer_page.dart';
 import 'receipt_settings_screen.dart';
+import '../database/database_helper.dart';
+import '../widgets/generic_breakdown_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -114,8 +112,46 @@ class DashboardScreen extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold, color: InstaPalette.textSecondary),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
-              // Inventory Row
+              const SizedBox(height: 24),
+
+              // --- PERFORMANCE SECTION ---
+              _buildSectionHeader('PERFORMANCE'),
+              Row(
+                children: [
+                  Expanded(child: _buildSummaryCard(
+                    'Total Revenue', 
+                    summaryAsync, 
+                    (d) => '\$${d['revenue']?.toStringAsFixed(2)}',
+                    isPrimary: true,
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getSalesBreakdown(dateRange?.start, dateRange?.end);
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Revenue Breakdown',
+                        items: items,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text('Sale #${item['id']}'),
+                            subtitle: Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(item['created_at']))),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildSummaryCard(
+                    'Net Profit', 
+                    summaryAsync, 
+                    (d) => '\$${d['net_profit']?.toStringAsFixed(2)}',
+                    isPrimary: true,
+                  )),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // --- OPERATIONS SECTION ---
+              _buildSectionHeader('OPERATIONS'),
               Row(
                 children: [
                   Expanded(child: _buildSummaryCard(
@@ -133,85 +169,172 @@ class DashboardScreen extends ConsumerWidget {
                   )),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Revenue & Profit Row
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _buildSummaryCard('Revenue', summaryAsync, (d) => '\$${d['revenue']?.toStringAsFixed(2)}')),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildSummaryCard('Net Profit', summaryAsync, (d) => '\$${d['net_profit']?.toStringAsFixed(2)}')),
+                  Expanded(child: _buildSummaryCard(
+                    'Logistics', 
+                    summaryAsync, 
+                    (d) => '\$${d['delivery_costs']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getExpensesBreakdown(dateRange?.start, dateRange?.end);
+                      final filtered = items.where((i) => i['name'] == 'Delivery').toList();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Logistics Breakdown',
+                        items: filtered,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['description']),
+                            subtitle: Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(item['created_at']))),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildSummaryCard(
+                    'Wages', 
+                    summaryAsync, 
+                    (d) => '\$${d['employee_costs']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getExpensesBreakdown(dateRange?.start, dateRange?.end);
+                      final filtered = items.where((i) => i['name'] == 'Employee').toList();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Wages Breakdown',
+                        items: filtered,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['description']),
+                            subtitle: Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(item['created_at']))),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildSummaryCard(
+                    'Depreciation', 
+                    summaryAsync, 
+                    (d) => '\$${d['depreciation']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getAllFixedAssets();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Depreciation Breakdown',
+                        items: items,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['name']),
+                            subtitle: Text('Purchase: ${DateFormat('yyyy-MM-dd').format(DateTime.parse(item['purchase_date']))}'),
+                            trailing: Text('\$${(item['purchase_price'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Overhead Row
+              const SizedBox(height: 24),
+
+              // --- FINANCIAL HEALTH ---
+              _buildSectionHeader('FINANCIAL HEALTH'),
               Row(
                 children: [
-                  Expanded(child: _buildSummaryCard('Logistics', summaryAsync, (d) => '\$${d['delivery_costs']?.toStringAsFixed(2)}')),
+                  Expanded(child: _buildSummaryCard(
+                    'Cust. Debt', 
+                    summaryAsync, 
+                    (d) => '\$${d['total_debt']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getDebtBreakdown();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Debt Breakdown',
+                        items: items,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['name']),
+                            subtitle: Text('Sale ID: ${item['id']}'),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildSummaryCard('Wages', summaryAsync, (d) => '\$${d['employee_costs']?.toStringAsFixed(2)}')),
+                  Expanded(child: _buildSummaryCard(
+                    'Owner Equity', 
+                    summaryAsync, 
+                    (d) => '\$${d['total_equity']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getEquityBreakdown();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Equity Breakdown',
+                        items: items,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['type']),
+                            subtitle: Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(item['created_at']))),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Debt Row
-              Row(
-                children: [
-                  Expanded(child: _buildSummaryCard('Total Cust. Debt', summaryAsync, (d) => '\$${d['total_debt']?.toStringAsFixed(2)}')),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildSummaryCard('Other Expenses', summaryAsync, (d) => '\$${d['other_expenses']?.toStringAsFixed(2)}')),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Audit Rows
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(child: _buildSummaryCard('Tax Liability', summaryAsync, (d) => '\$${d['tax_liability']?.toStringAsFixed(2)}')),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildSummaryCard('Depreciation', summaryAsync, (d) => '\$${d['depreciation']?.toStringAsFixed(2)}')),
+                  Expanded(child: _buildSummaryCard(
+                    'Other Expenses', 
+                    summaryAsync, 
+                    (d) => '\$${d['other_expenses']?.toStringAsFixed(2)}',
+                    onTap: () async {
+                      final items = await DatabaseHelper.instance.getExpensesBreakdown(dateRange?.start, dateRange?.end);
+                      final filtered = items.where((i) => i['name'] != 'Delivery' && i['name'] != 'Employee').toList();
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => GenericBreakdownScreen(
+                        title: 'Other Expenses',
+                        items: filtered,
+                        itemBuilder: (context, item) => Card(
+                          child: ListTile(
+                            title: Text(item['name']),
+                            subtitle: Text(item['description']),
+                            trailing: Text('\$${(item['amount'] as num).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      )));
+                    },
+                  )),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
+
+              // --- QUICK ACTIONS ---
+              _buildSectionHeader('QUICK ACTIONS'),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 2.5,
                 children: [
-                  Expanded(child: _buildSummaryCard('Owner Equity', summaryAsync, (d) => '\$${d['total_equity']?.toStringAsFixed(2)}')),
-                  const Spacer(),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(child: _buildActionCard(context, 'Suppliers', Icons.local_shipping, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen())))),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildActionCard(context, 'Customers', Icons.people, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen())))),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Column(
-                children: [
-                  Text('QUICK ACTIONS', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary), textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  _buildLargeButton(context, 'NEW PURCHASE', Icons.shopping_cart, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseFormPage()))),
-                  const SizedBox(height: 12),
                   _buildLargeButton(context, 'NEW SALE', Icons.sell, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SaleFormPage()))),
-                  const SizedBox(height: 12),
-                  _buildLargeButton(context, 'RECORD EXPENSE', Icons.money_off, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()))),
-                  const SizedBox(height: 12),
-                  _buildLargeButton(context, 'RECORD EQUITY', Icons.account_balance_wallet, () => QuickAddDialogs.showEquityDialog(context, ref)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildLargeButton(context, 'SUPPLIER', Icons.person_add, () => QuickAddDialogs.showAddSupplierDialog(context, ref))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildLargeButton(context, 'CUSTOMER', Icons.person_add_alt_1, () => QuickAddDialogs.showAddCustomerDialog(context, ref))),
-                    ],
-                  ),
+                  _buildLargeButton(context, 'NEW PURCHASE', Icons.shopping_cart, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseFormPage()))),
+                  _buildLargeButton(context, 'EXPENSE', Icons.money_off, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()))),
+                  _buildLargeButton(context, 'EQUITY', Icons.account_balance_wallet, () => QuickAddDialogs.showEquityDialog(context, ref)),
                 ],
               ),
               const SizedBox(height: 24),
-              Text('REPORTS', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary), textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              _buildLargeButton(context, 'RECEIPT DESIGNER', Icons.design_services, () => Navigator.push(context, MaterialPageRoute(builder: (_) => DesignerPage()))),
-              const SizedBox(height: 12),
-              _buildLargeButton(context, 'VIEW REPORTS', Icons.analytics, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen()))),
+
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -219,32 +342,81 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap}) {
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12, 
+              fontWeight: FontWeight.bold, 
+              color: InstaPalette.textSecondary,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(width: 24, height: 2, color: Colors.orange),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap, bool isPrimary = false}) {
     return Card(
       elevation: 0,
-      color: InstaPalette.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
+      color: isPrimary ? InstaPalette.textPrimary : InstaPalette.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12), 
+        side: BorderSide(color: isPrimary ? Colors.transparent : InstaPalette.border),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-          child: Column(
+          padding: EdgeInsets.symmetric(vertical: isPrimary ? 24 : 16, horizontal: 8),
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Text(title, style: const TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
-              const SizedBox(height: 8),
-              asyncValue.when(
-                data: (d) => Text(dataMapper(d), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary)),
-                loading: () => const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                error: (e, s) {
-                  debugPrint('Dashboard card error: $e');
-                  return const Icon(Icons.error_outline, color: Colors.red, size: 20);
-                },
+              Column(
+                children: [
+                  Text(
+                    title, 
+                    style: TextStyle(
+                      fontSize: 11, 
+                      color: isPrimary ? Colors.white70 : InstaPalette.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  asyncValue.when(
+                    data: (d) => Text(
+                      dataMapper(d), 
+                      style: TextStyle(
+                        fontSize: isPrimary ? 20 : 14, 
+                        fontWeight: FontWeight.bold, 
+                        color: isPrimary ? Colors.white : InstaPalette.textPrimary,
+                      ),
+                    ),
+                    loading: () => SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: isPrimary ? Colors.white : InstaPalette.accent),
+                    ),
+                    error: (e, s) {
+                      debugPrint('Dashboard card error: $e');
+                      return const Icon(Icons.error_outline, color: Colors.red, size: 20);
+                    },
+                  ),
+                ],
               ),
+              if (onTap != null)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Icon(Icons.chevron_right, size: 16, color: isPrimary ? Colors.white70 : InstaPalette.textSecondary),
+                ),
             ],
           ),
         ),
@@ -263,28 +435,7 @@ class DashboardScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        minimumSize: const Size(150, 40),
-      ),
-    );
-  }
-
-  Widget _buildActionCard(BuildContext context, String title, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Card(
-        elevation: 0,
-        color: InstaPalette.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Icon(icon, size: 24, color: InstaPalette.textPrimary),
-              const SizedBox(height: 8),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: InstaPalette.textPrimary)),
-            ],
-          ),
-        ),
+        minimumSize: const Size(double.infinity, 48),
       ),
     );
   }

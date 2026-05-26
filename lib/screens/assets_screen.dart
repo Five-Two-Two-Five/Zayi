@@ -77,6 +77,10 @@ class _AssetsScreenState extends ConsumerState<AssetsScreen> {
                               Text('Useful Life: ${asset.usefulLifeMonths} months', style: const TextStyle(fontSize: 11, color: InstaPalette.textSecondary)),
                               const Spacer(),
                               IconButton(
+                                icon: const Icon(Icons.edit, color: InstaPalette.accent, size: 20),
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => _AssetFormPage(asset: asset))),
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
@@ -129,27 +133,39 @@ class _AssetsScreenState extends ConsumerState<AssetsScreen> {
 }
 
 class _AssetFormPage extends StatefulWidget {
-  const _AssetFormPage();
+  final FixedAsset? asset;
+  const _AssetFormPage({this.asset});
 
   @override
   State<_AssetFormPage> createState() => _AssetFormPageState();
 }
 
 class _AssetFormPageState extends State<_AssetFormPage> {
-  final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _lifeController = TextEditingController(text: '60'); // Default 5 years
-  final _residualController = TextEditingController(text: '0');
-  final _notesController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
+  late TextEditingController _nameController;
+  late TextEditingController _priceController;
+  late TextEditingController _lifeController;
+  late TextEditingController _residualController;
+  late TextEditingController _notesController;
+  late DateTime _selectedDate;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.asset?.name ?? '');
+    _priceController = TextEditingController(text: widget.asset?.purchasePrice.toString() ?? '');
+    _lifeController = TextEditingController(text: widget.asset?.usefulLifeMonths.toString() ?? '60');
+    _residualController = TextEditingController(text: widget.asset?.residualValue.toString() ?? '0');
+    _notesController = TextEditingController(text: widget.asset?.notes ?? '');
+    _selectedDate = widget.asset?.purchaseDate ?? DateTime.now();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer(
       builder: (context, ref, child) {
         return FullPageAddDialog(
-          title: 'Add Fixed Asset',
+          title: widget.asset == null ? 'Add Fixed Asset' : 'Edit Fixed Asset',
           isSaving: _isSaving,
           onSave: () async {
             if (_nameController.text.isEmpty || _priceController.text.isEmpty || _lifeController.text.isEmpty) {
@@ -160,6 +176,7 @@ class _AssetFormPageState extends State<_AssetFormPage> {
             setState(() => _isSaving = true);
             try {
               final asset = FixedAsset(
+                id: widget.asset?.id,
                 name: _nameController.text,
                 purchasePrice: double.parse(_priceController.text),
                 purchaseDate: _selectedDate,
@@ -168,12 +185,17 @@ class _AssetFormPageState extends State<_AssetFormPage> {
                 notes: _notesController.text,
               );
 
-              await DatabaseHelper.instance.createFixedAsset(asset.toMap());
+              if (widget.asset == null) {
+                await DatabaseHelper.instance.createFixedAsset(asset.toMap());
+              } else {
+                await DatabaseHelper.instance.updateFixedAsset(asset);
+              }
               ref.read(assetsProvider.notifier).refresh();
               ref.invalidate(dashboardSummaryProvider);
               if (!mounted) return;
               Navigator.pop(context);
             } catch (e) {
+              if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
             } finally {
               if (mounted) setState(() => _isSaving = false);
@@ -181,7 +203,7 @@ class _AssetFormPageState extends State<_AssetFormPage> {
           },
           child: Column(
             children: [
-              TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Asset Name (e.g. Delivery Van)', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+              TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Asset Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
               TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Purchase Price', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
               ListTile(
                 title: Text('Purchase Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}', style: const TextStyle(color: InstaPalette.textPrimary)),

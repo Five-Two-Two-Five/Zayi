@@ -1,5 +1,6 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:flutter/foundation.dart';
 import '../models/supplier.dart';
 import '../models/customer.dart';
 import '../models/purchase.dart';
@@ -26,13 +27,15 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
+      onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // ... existing migration logic ...
     if (oldVersion < 5) {
       await _addColumnIfNotExists(db, 'sales', 'delivery_cost', 'REAL DEFAULT 0');
     }
@@ -82,7 +85,19 @@ class DatabaseHelper {
           tax_id TEXT,
           phone TEXT,
           email TEXT,
-          footer_note TEXT
+          footer_note TEXT,
+          default_tax_rate REAL DEFAULT 0
+        )
+      ''');
+    }
+    if (oldVersion < 10) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS sale_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sale_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
         )
       ''');
     }
@@ -462,6 +477,16 @@ class DatabaseHelper {
     return await db.delete('fixed_assets', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<int> updateFixedAsset(FixedAsset asset) async {
+    final db = await instance.database;
+    return await db.update(
+      'fixed_assets',
+      asset.toMap(),
+      where: 'id = ?',
+      whereArgs: [asset.id],
+    );
+  }
+
   // Equity Ledger
   Future<int> createEquityTransaction(Map<String, dynamic> transaction) async {
     final db = await instance.database;
@@ -483,6 +508,50 @@ class DatabaseHelper {
       if (row['type'] == 'DRAWING') drawing = (row['total'] as num).toDouble();
     }
     return contribution - drawing;
+  }
+
+  // Debt Management
+  Future<int> addPayment(int saleId, double amount) async {
+    final db = await instance.database;
+    return await db.insert('sale_payments', {
+      'sale_id': saleId,
+      'amount': amount,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentsForSale(int saleId) async {
+    final db = await instance.database;
+    return await db.query('sale_payments', where: 'sale_id = ?', whereArgs: [saleId], orderBy: 'created_at DESC');
+  }
+
+  // Breakdown Methods
+  Future<List<Map<String, dynamic>>> getSalesBreakdown(DateTime? start, DateTime? end) async {
+    final db = await instance.database;
+    String filter = '';
+    if (start != null && end != null) {
+      filter = 'WHERE date(created_at) BETWEEN "${start.toIso8601String().substring(0,10)}" AND "${end.toIso8601String().substring(0,10)}"';
+    }
+    return await db.rawQuery('SELECT id, total_revenue as amount, created_at FROM sales $filter ORDER BY created_at DESC');
+  }
+
+  Future<List<Map<String, dynamic>>> getExpensesBreakdown(DateTime? start, DateTime? end) async {
+    final db = await instance.database;
+    String filter = '';
+    if (start != null && end != null) {
+      filter = 'WHERE date(created_at) BETWEEN "${start.toIso8601String().substring(0,10)}" AND "${end.toIso8601String().substring(0,10)}"';
+    }
+    return await db.rawQuery('SELECT expense_type as name, amount, description, created_at FROM expenses $filter ORDER BY created_at DESC');
+  }
+
+  Future<List<Map<String, dynamic>>> getDebtBreakdown() async {
+    final db = await instance.database;
+    return await db.rawQuery('SELECT s.id, c.name, s.balance_due as amount FROM sales s JOIN customers c ON s.customer_id = c.id WHERE s.balance_due > 0');
+  }
+
+  Future<List<Map<String, dynamic>>> getEquityBreakdown() async {
+    final db = await instance.database;
+    return await db.query('equity_ledger', orderBy: 'created_at DESC');
   }
 
   // Metrics
@@ -583,14 +652,19 @@ class DatabaseHelper {
     final rangeEnd = end ?? DateTime.now();
 
     for (var asset in allAssets) {
+      debugPrint('Debugging Asset: ${asset.name}, Purchase Price: ${asset.purchasePrice}, Monthly Depr: ${asset.monthlyDepreciation}');
       // Check if asset was owned during the range
-      if (asset.purchaseDate.isBefore(rangeEnd)) {
+      if (asset.purchaseDate.isBefore(rangeEnd.add(const Duration(days: 1)))) {
         final effectiveStart = asset.purchaseDate.isAfter(rangeStart) ? asset.purchaseDate : rangeStart;
         final daysOwnedInRange = rangeEnd.difference(effectiveStart).inDays + 1;
         
-        // Simple straight-line daily depreciation
-        final dailyDepr = asset.monthlyDepreciation / 30;
-        depreciationExpense += dailyDepr * daysOwnedInRange;
+        if (daysOwnedInRange > 0) {
+          // Simple straight-line daily depreciation
+          final dailyDepr = asset.monthlyDepreciation / 30;
+          final deprForRange = dailyDepr * daysOwnedInRange;
+          debugPrint('Asset: ${asset.name}, Days Owned in Range: $daysOwnedInRange, Depr for range: $deprForRange');
+          depreciationExpense += deprForRange;
+        }
       }
     }
 

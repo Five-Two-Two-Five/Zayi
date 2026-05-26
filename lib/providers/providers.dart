@@ -10,8 +10,6 @@ import '../models/fixed_asset.dart';
 import '../models/equity_transaction.dart';
 import '../models/receipt_settings.dart';
 
-// ... (after equityProvider)
-
 // Receipt Settings Provider
 final receiptSettingsProvider = AsyncNotifierProvider<ReceiptSettingsNotifier, ReceiptSettings>(() {
   return ReceiptSettingsNotifier();
@@ -30,7 +28,7 @@ class ReceiptSettingsNotifier extends AsyncNotifier<ReceiptSettings> {
   }
 }
 
-// Inventory Provider
+// Suppliers Provider
 final suppliersProvider = AsyncNotifierProvider<SuppliersNotifier, List<Supplier>>(() {
   return SuppliersNotifier();
 });
@@ -44,6 +42,11 @@ class SuppliersNotifier extends AsyncNotifier<List<Supplier>> {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => DatabaseHelper.instance.getAllSuppliers());
+  }
+
+  Future<void> editSupplier(Supplier supplier) async {
+    await DatabaseHelper.instance.updateSupplier(supplier);
+    await refresh();
   }
 }
 
@@ -61,6 +64,11 @@ class CustomersNotifier extends AsyncNotifier<List<Customer>> {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => DatabaseHelper.instance.getAllCustomers());
+  }
+
+  Future<void> editCustomer(Customer customer) async {
+    await DatabaseHelper.instance.updateCustomer(customer);
+    await refresh();
   }
 }
 
@@ -130,6 +138,11 @@ class AssetsNotifier extends AsyncNotifier<List<FixedAsset>> {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => build());
+  }
+
+  Future<void> editAsset(FixedAsset asset) async {
+    await DatabaseHelper.instance.updateFixedAsset(asset);
+    await refresh();
   }
 }
 
