@@ -97,6 +97,10 @@ final inventoryBalanceProvider = FutureProvider<int>((ref) async {
   return await DatabaseHelper.instance.getInventoryBalance();
 });
 
+final inventoryBreakdownProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return await DatabaseHelper.instance.getInventoryBreakdown();
+});
+
 // Dashboard Filters
 class DashboardDateRangeNotifier extends Notifier<DateTimeRange?> {
   @override

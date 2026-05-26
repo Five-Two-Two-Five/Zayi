@@ -10,6 +10,7 @@ import 'purchase_screen.dart';
 import 'sale_screen.dart';
 import 'expense_screen.dart';
 import 'reports_screen.dart';
+import 'inventory_breakdown_screen.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
 import 'package:intl/intl.dart';
 
@@ -96,11 +97,22 @@ class DashboardScreen extends ConsumerWidget {
               Row(
                 key: _inventoryKey,
                 children: [
-                  Expanded(child: _buildSummaryCard('Stock Count', inventoryAsync, (d) => '$d Crates')),
+                  Expanded(child: _buildSummaryCard(
+                    'Stock Count', 
+                    inventoryAsync, 
+                    (d) => '$d Crates',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryBreakdownScreen())),
+                  )),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildSummaryCard('Stock Value', summaryAsync, (d) => '\$${d['inventory_value']?.toStringAsFixed(2)}')),
+                  Expanded(child: _buildSummaryCard(
+                    'Stock Value', 
+                    summaryAsync, 
+                    (d) => '\$${d['inventory_value']?.toStringAsFixed(2)}',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryBreakdownScreen())),
+                  )),
                 ],
               ),
+// ... (omitting lines for brevity in instruction, but full replacement is required)
               const SizedBox(height: 16),
               // Revenue & Profit Row
               Row(
@@ -234,30 +246,34 @@ class DashboardScreen extends ConsumerWidget {
   }
 
 
-  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper) {
+  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap}) {
     return Card(
       elevation: 0,
       color: InstaPalette.cardBackground,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-        child: Column(
-          children: [
-            Text(title, style: const TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
-            const SizedBox(height: 8),
-            asyncValue.when(
-              data: (d) => Text(dataMapper(d), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary)),
-              loading: () => const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+          child: Column(
+            children: [
+              Text(title, style: const TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
+              const SizedBox(height: 8),
+              asyncValue.when(
+                data: (d) => Text(dataMapper(d), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary)),
+                loading: () => const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (e, s) {
+                  debugPrint('Dashboard card error: $e');
+                  return const Icon(Icons.error_outline, color: Colors.red, size: 20);
+                },
               ),
-              error: (e, s) {
-                debugPrint('Dashboard card error: $e');
-                return const Icon(Icons.error_outline, color: Colors.red, size: 20);
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

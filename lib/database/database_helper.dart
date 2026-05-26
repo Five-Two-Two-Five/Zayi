@@ -388,6 +388,17 @@ class DatabaseHelper {
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
+  Future<List<Map<String, dynamic>>> getInventoryBreakdown() async {
+    final db = await instance.database;
+    return await db.rawQuery('''
+      SELECT p.*, s.name as supplier_name
+      FROM purchases p
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
+      WHERE p.remaining_eggs > 0
+      ORDER BY p.created_at ASC
+    ''');
+  }
+
   // Reports/Calculations
   Future<Map<String, double>> getSummaryInRange(
     DateTime? start,
