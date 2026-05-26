@@ -276,7 +276,8 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
           ref.invalidate(dashboardSummaryProvider);
 
           final finalSale = sale.copyWith(id: id);
-          final receiptData = ReceiptMapper.fromSale(finalSale, customerToUse);
+          final settings = await ref.read(receiptSettingsProvider.future);
+          final receiptData = ReceiptMapper.fromSale(finalSale, customerToUse, settings: settings);
           
           if (!context.mounted) return;
           Navigator.pop(context);

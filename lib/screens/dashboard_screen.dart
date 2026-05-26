@@ -11,13 +11,14 @@ import 'expense_screen.dart';
 import 'reports_screen.dart';
 import 'inventory_breakdown_screen.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
+import 'receipt_settings_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
-  DashboardScreen({super.key});
+  const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(dashboardSummaryProvider);
     final inventoryAsync = ref.watch(inventoryBalanceProvider);
     final dateRange = ref.watch(dashboardDateRangeProvider);
@@ -30,6 +31,36 @@ class DashboardScreen extends ConsumerWidget {
         foregroundColor: InstaPalette.textPrimary,
         elevation: 0.5,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: InstaPalette.textPrimary),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: InstaPalette.cardBackground,
+                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                builder: (context) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(width: 40, height: 4, decoration: BoxDecoration(color: InstaPalette.border, borderRadius: BorderRadius.circular(2))),
+                    const SizedBox(height: 12),
+                    const Text('SETTINGS', style: TextStyle(fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      leading: const Icon(Icons.receipt_long, color: InstaPalette.textPrimary),
+                      title: const Text('Receipt Settings', style: TextStyle(color: InstaPalette.textPrimary)),
+                      subtitle: const Text('Configure business name, address, and tax info', style: TextStyle(fontSize: 12)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ReceiptSettingsScreen()));
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              );
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list, color: InstaPalette.textPrimary),
             onSelected: (value) async {

@@ -8,8 +8,29 @@ import '../models/sale.dart';
 import '../models/expense.dart';
 import '../models/fixed_asset.dart';
 import '../models/equity_transaction.dart';
+import '../models/receipt_settings.dart';
 
-// Suppliers Provider
+// ... (after equityProvider)
+
+// Receipt Settings Provider
+final receiptSettingsProvider = AsyncNotifierProvider<ReceiptSettingsNotifier, ReceiptSettings>(() {
+  return ReceiptSettingsNotifier();
+});
+
+class ReceiptSettingsNotifier extends AsyncNotifier<ReceiptSettings> {
+  @override
+  Future<ReceiptSettings> build() async {
+    final map = await DatabaseHelper.instance.getReceiptSettings();
+    return ReceiptSettings.fromMap(map);
+  }
+
+  Future<void> updateSettings(ReceiptSettings settings) async {
+    await DatabaseHelper.instance.updateReceiptSettings(settings.toMap());
+    state = AsyncValue.data(settings);
+  }
+}
+
+// Inventory Provider
 final suppliersProvider = AsyncNotifierProvider<SuppliersNotifier, List<Supplier>>(() {
   return SuppliersNotifier();
 });

@@ -5,31 +5,55 @@ import 'package:printing/printing.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/receipt_renderer.dart';
 import '../providers/designer_provider.dart';
+import '../../../../providers/providers.dart';
 
-class DesignerPage extends ConsumerWidget {
+class DesignerPage extends ConsumerStatefulWidget {
   final Map<String, dynamic>? transactionData;
   final bool isReadOnly;
 
   const DesignerPage({super.key, this.transactionData, this.isReadOnly = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DesignerPage> createState() => _DesignerPageState();
+}
+
+class _DesignerPageState extends ConsumerState<DesignerPage> {
+  bool _isDigitalFormat = false;
+
+  @override
+  Widget build(BuildContext context) {
     final template = ref.watch(designerProvider);
+    final settingsAsync = ref.watch(receiptSettingsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(isReadOnly ? "View Receipt" : "Receipt Designer")),
+      appBar: AppBar(title: Text(widget.isReadOnly ? "View Receipt" : "Receipt Designer")),
       body: Column(
         children: [
-          // Top Panel: Settings (Only show if NOT in read-only mode)
-          if (!isReadOnly)
+          // Top Panel: Style Settings (Only show if NOT in read-only mode)
+          if (!widget.isReadOnly)
             SizedBox(
-              height: 250, 
+              height: 220, 
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(labelText: "Business Name"),
-                    onChanged: (v) => ref.read(designerProvider.notifier).updateHeader({'businessName': v}),
+                  const Text("LAYOUT & LOGO", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text("Format: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      ChoiceChip(
+                        label: const Text("Thermal"),
+                        selected: !_isDigitalFormat,
+                        onSelected: (v) => setState(() => _isDigitalFormat = false),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text("E-Receipt"),
+                        selected: _isDigitalFormat,
+                        onSelected: (v) => setState(() => _isDigitalFormat = true),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
@@ -46,6 +70,7 @@ class DesignerPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 10),
                   ListTile(
+                    contentPadding: EdgeInsets.zero,
                     title: const Text("Show Header"),
                     trailing: Switch(
                       value: template.headerSettings['show'] ?? true,
@@ -60,26 +85,37 @@ class DesignerPage extends ConsumerWidget {
             child: Column(
               children: [
                 Expanded(
-                  child: PdfPreview(
-                    build: (format) async {
-                      final dataToRender = Map<String, dynamic>.from(transactionData ?? {
-                        'receiptNumber': '1-2112076',
-                        'customerName': 'Nikil arora',
-                        'date': '2026-05-25 07:50:27pm',
-                        'items': [{'name': 'Apple juice 750 ml', 'qty': 1, 'total': '250,00'}],
-                        'subTotal': '250,00',
-                        'total': '250,00',
-                        'cash': '250,00',
-                        'balance': '0.00'
-                      });
-                      
-                      if (template.headerSettings['businessName'] != null) {
-                        dataToRender['issuer'] = template.headerSettings['businessName'];
-                      }
+                  child: settingsAsync.when(
+                    data: (settings) => PdfPreview(
+                      build: (format) async {
+                        final dataToRender = Map<String, dynamic>.from(widget.transactionData ?? {
+                          'receiptNumber': '1-SAMPLE',
+                          'customerName': 'Sample Customer',
+                          'date': '2026-05-26 12:00 PM',
+                          'items': [{'name': 'Product Name', 'qty': 1, 'total': '100.00'}],
+                          'subTotal': '100.00',
+                          'total': '100.00',
+                          'cash': '100.00',
+                          'balance': '0.00',
+                        });
+                        
+                        // Apply Global Settings
+                        dataToRender['issuer'] = settings.businessName;
+                        dataToRender['address'] = settings.address;
+                        dataToRender['taxId'] = settings.taxId;
+                        dataToRender['phone'] = settings.phone;
+                        dataToRender['footer'] = settings.footerNote;
 
-                      final doc = await ReceiptRenderer.render(template, dataToRender);
-                      return doc.save();
-                    },
+                        final doc = await ReceiptRenderer.render(
+                          template, 
+                          dataToRender, 
+                          isDigital: _isDigitalFormat,
+                        );
+                        return doc.save();
+                      },
+                    ),
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, s) => Center(child: Text('Error loading settings: $e')),
                   ),
                 ),
                 Padding(
@@ -88,14 +124,13 @@ class DesignerPage extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.print),
-                        label: const Text("Print"),
-                        onPressed: () {
-                           // Printing is handled by PdfPreview
+                        icon: const Icon(Icons.share),
+                        label: const Text("Share"),
+                        onPressed: () async {
+                           // PDF is shared directly from PdfPreview, 
+                           // but we can add custom sharing if needed.
                         },
                       ),
-                      // We can add a custom share button here for WhatsApp, 
-                      // using Printing.sharePdf()
                     ],
                   ),
                 ),

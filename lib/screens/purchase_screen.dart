@@ -100,7 +100,8 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                               ),
                             );
 
-                            final receiptData = ReceiptMapper.fromPurchase(p, supplier);
+                            final settings = await ref.read(receiptSettingsProvider.future);
+                            final receiptData = ReceiptMapper.fromPurchase(p, supplier, settings: settings);
                             if (!context.mounted) return;
                             Navigator.push(
                               context,
