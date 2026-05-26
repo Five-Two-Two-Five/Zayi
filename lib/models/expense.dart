@@ -38,14 +38,14 @@ class Expense {
   factory Expense.fromMap(Map<String, dynamic> map) {
     return Expense(
       id: map['id'],
-      expenseType: map['expense_type'],
-      amount: map['amount'],
-      description: map['description'],
+      expenseType: map['expense_type'] ?? '',
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      description: map['description'] ?? '',
       employeeName: map['employee_name'],
       extraDetails: map['extra_details'],
-      createdAt: DateTime.parse(map['created_at']),
-      latitude: map['latitude'],
-      longitude: map['longitude'],
+      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      latitude: (map['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (map['longitude'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

@@ -4,134 +4,120 @@ import '../models/supplier.dart';
 import '../models/customer.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
+import '../theme/insta_theme.dart';
+import 'full_page_add_dialog.dart';
 
 class QuickAddDialogs {
   static void showAddSupplierDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final locationController = TextEditingController();
-    final notesController = TextEditingController();
-    bool isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Add New Supplier'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name'), enabled: !isSaving),
-                TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone'), keyboardType: TextInputType.phone, enabled: !isSaving),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location'), enabled: !isSaving),
-                TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes'), enabled: !isSaving),
-                if (isSaving) ...[
-                  const SizedBox(height: 20),
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 8),
-                  const Text('Saving...'),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: isSaving ? null : () async {
-                if (nameController.text.isNotEmpty) {
-                  setState(() => isSaving = true);
-                  try {
-                    final supplier = Supplier(
-                      name: nameController.text,
-                      phone: phoneController.text,
-                      location: locationController.text,
-                      notes: notesController.text,
-                      createdAt: DateTime.now(),
-                    );
-                    await DatabaseHelper.instance.createSupplier(supplier);
-                    ref.read(suppliersProvider.notifier).refresh();
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Supplier added successfully')));
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  } finally {
-                    setState(() => isSaving = false);
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => _SupplierForm()));
   }
 
   static void showAddCustomerDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final locationController = TextEditingController();
-    final notesController = TextEditingController();
-    bool isSaving = false;
+    Navigator.push(context, MaterialPageRoute(builder: (context) => _CustomerForm()));
+  }
+}
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Add New Customer'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name'), enabled: !isSaving),
-                TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone'), keyboardType: TextInputType.phone, enabled: !isSaving),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location'), enabled: !isSaving),
-                TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes'), enabled: !isSaving),
-                if (isSaving) ...[
-                  const SizedBox(height: 20),
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 8),
-                  const Text('Saving...'),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: isSaving ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: isSaving ? null : () async {
-                if (nameController.text.isNotEmpty) {
-                  setState(() => isSaving = true);
-                  try {
-                    final customer = Customer(
-                      name: nameController.text,
-                      phone: nameController.text.isEmpty ? '' : phoneController.text,
-                      location: locationController.text,
-                      notes: notesController.text,
-                      createdAt: DateTime.now(),
-                    );
-                    await DatabaseHelper.instance.createCustomer(customer);
-                    ref.read(customersProvider.notifier).refresh();
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer added successfully')));
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  } finally {
-                    setState(() => isSaving = false);
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+class _SupplierForm extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_SupplierForm> createState() => _SupplierFormState();
+}
+
+class _SupplierFormState extends ConsumerState<_SupplierForm> {
+  final nameController = TextEditingController();
+  final phoneController = TextEditingController();
+  final locationController = TextEditingController();
+  final notesController = TextEditingController();
+  bool isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FullPageAddDialog(
+      title: 'Add New Supplier',
+      isSaving: isSaving,
+      onSave: () async {
+        if (nameController.text.isNotEmpty) {
+          setState(() => isSaving = true);
+          try {
+            final supplier = Supplier(
+              name: nameController.text,
+              phone: phoneController.text,
+              location: locationController.text,
+              notes: notesController.text,
+              createdAt: DateTime.now(),
+            );
+            await DatabaseHelper.instance.createSupplier(supplier);
+            ref.read(suppliersProvider.notifier).refresh();
+            if (!context.mounted) return;
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Supplier added successfully')));
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          } finally {
+            if (mounted) setState(() => isSaving = false);
+          }
+        }
+      },
+      child: Column(
+        children: [
+          TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+          TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
+          TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+          TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerForm extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_CustomerForm> createState() => _CustomerFormState();
+}
+
+class _CustomerFormState extends ConsumerState<_CustomerForm> {
+  final nameController = TextEditingController();
+  final phoneController = TextEditingController();
+  final locationController = TextEditingController();
+  final notesController = TextEditingController();
+  bool isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FullPageAddDialog(
+      title: 'Add New Customer',
+      isSaving: isSaving,
+      onSave: () async {
+        if (nameController.text.isNotEmpty) {
+          setState(() => isSaving = true);
+          try {
+            final customer = Customer(
+              name: nameController.text,
+              phone: phoneController.text,
+              location: locationController.text,
+              notes: notesController.text,
+              createdAt: DateTime.now(),
+            );
+            await DatabaseHelper.instance.createCustomer(customer);
+            ref.read(customersProvider.notifier).refresh();
+            if (!context.mounted) return;
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Customer added successfully')));
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          } finally {
+            if (mounted) setState(() => isSaving = false);
+          }
+        }
+      },
+      child: Column(
+        children: [
+          TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+          TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
+          TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+          TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+        ],
       ),
     );
   }

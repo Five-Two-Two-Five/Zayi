@@ -29,9 +29,11 @@ class ExportService {
 
     await file.writeAsString(csvData);
     
-    await Share.shareXFiles(
-      [XFile(path)],
-      text: 'Exported $tableName records',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(path)],
+        text: 'Exported $tableName records',
+      ),
     );
   }
 
@@ -113,9 +115,11 @@ class ExportService {
 
     await file.writeAsString(csvData);
     
-    await Share.shareXFiles(
-      [XFile(path)],
-      text: 'Zayi Master Financial Log for Time Series Analysis',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(path)],
+        text: 'Zayi Master Financial Log for Time Series Analysis',
+      ),
     );
   }
 

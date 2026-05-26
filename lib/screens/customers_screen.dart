@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../widgets/quick_add_dialogs.dart';
+import '../theme/insta_theme.dart';
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -17,10 +18,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final customersAsync = ref.watch(customersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customers')),
+      backgroundColor: InstaPalette.background,
+      appBar: AppBar(
+        title: const Text('Customers', style: TextStyle(color: InstaPalette.textPrimary)),
+        backgroundColor: InstaPalette.background,
+        foregroundColor: InstaPalette.textPrimary,
+        elevation: 0.5,
+      ),
       body: customersAsync.when(
         data: (customers) => customers.isEmpty
-            ? const Center(child: Text('No customers found.'))
+            ? const Center(child: Text('No customers found.', style: TextStyle(color: InstaPalette.textSecondary)))
             : ListView.builder(
                 itemCount: customers.length,
                 itemBuilder: (context, index) {
@@ -29,7 +36,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     key: Key('customer_${customer.id}'),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      color: Colors.red,
+                      color: Colors.red, // Keep red for delete
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: const Icon(Icons.delete, color: Colors.white),
@@ -47,12 +54,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     },
                     child: ListTile(
                       leading: const CircleAvatar(
-                        backgroundColor: Colors.orange,
-                        child: Icon(Icons.person),
+                        backgroundColor: InstaPalette.accent,
+                        child: Icon(Icons.person, color: InstaPalette.background),
                       ),
-                      title: Text(customer.name),
-                      subtitle: Text(customer.phone),
-                      trailing: const Icon(Icons.chevron_right),
+                      title: Text(customer.name, style: const TextStyle(color: InstaPalette.textPrimary)),
+                      subtitle: Text(customer.phone, style: const TextStyle(color: InstaPalette.textSecondary)),
+                      trailing: const Icon(Icons.chevron_right, color: InstaPalette.textSecondary),
                       onTap: () {
                         // View History logic
                       },
@@ -60,13 +67,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   );
                 },
               ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () => const Center(child: CircularProgressIndicator(color: InstaPalette.accent)),
+        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => QuickAddDialogs.showAddCustomerDialog(context, ref),
-        backgroundColor: Colors.orange,
-        child: const Icon(Icons.add),
+        backgroundColor: InstaPalette.textPrimary,
+        child: const Icon(Icons.add, color: InstaPalette.background),
       ),
     );
   }

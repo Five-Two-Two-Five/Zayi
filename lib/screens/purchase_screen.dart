@@ -6,6 +6,11 @@ import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../services/location_service.dart';
 import 'package:intl/intl.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import '../features/receipts/services/receipt_mapper.dart';
+import '../features/receipts/presentation/pages/designer_page.dart';
+import '../theme/insta_theme.dart';
+import '../widgets/full_page_add_dialog.dart';
 
 class PurchaseScreen extends ConsumerStatefulWidget {
   const PurchaseScreen({super.key});
@@ -15,294 +20,8 @@ class PurchaseScreen extends ConsumerStatefulWidget {
 }
 
 class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
-  final _cratesController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _transportController = TextEditingController(text: '0');
-  final _otherController = TextEditingController(text: '0');
-  final _notesController = TextEditingController();
-
-  // Quick Add Supplier controllers
-  final _newNameController = TextEditingController();
-  final _newPhoneController = TextEditingController();
-
-  Supplier? _selectedSupplier;
-  DateTime _selectedDate = DateTime.now();
-  bool _isSaving = false;
-  bool _isQuickAddingSupplier = false;
-
   void _showAddPurchaseDialog() {
-    // Start location fetch early
-    final locationFuture = LocationService.getCurrentLocation();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            final suppliersAsync = ref.watch(suppliersProvider);
-
-            return AlertDialog(
-              title: const Text('New Purchase'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      title: Text(
-                        'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                      ),
-                      trailing: const Icon(Icons.calendar_today),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedDate,
-                          firstDate: DateTime(2023),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setState(() => _selectedDate = picked);
-                        }
-                      },
-                    ),
-                    suppliersAsync.when(
-                      data: (list) {
-                        return Column(
-                          children: [
-                            DropdownButtonFormField<dynamic>(
-                              decoration: const InputDecoration(
-                                labelText: 'Supplier',
-                              ),
-                              initialValue: _isQuickAddingSupplier
-                                  ? 'ADD_NEW'
-                                  : _selectedSupplier,
-                              items: [
-                                ...list.map(
-                                  (s) => DropdownMenuItem(
-                                    value: s,
-                                    child: Text(s.name),
-                                  ),
-                                ),
-                                const DropdownMenuItem(
-                                  value: 'ADD_NEW',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.add, color: Colors.green),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Add New Supplier',
-                                        style: TextStyle(
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              onChanged: _isSaving
-                                  ? null
-                                  : (val) {
-                                      if (val == 'ADD_NEW') {
-                                        setState(() {
-                                          _isQuickAddingSupplier = true;
-                                          _selectedSupplier = null;
-                                        });
-                                      } else {
-                                        setState(() {
-                                          _isQuickAddingSupplier = false;
-                                          _selectedSupplier = val as Supplier;
-                                        });
-                                      }
-                                    },
-                            ),
-                            if (_isQuickAddingSupplier) ...[
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _newNameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'New Supplier Name',
-                                  prefixIcon: Icon(Icons.person),
-                                ),
-                                enabled: !_isSaving,
-                              ),
-                              TextField(
-                                controller: _newPhoneController,
-                                decoration: const InputDecoration(
-                                  labelText: 'New Supplier Phone',
-                                  prefixIcon: Icon(Icons.phone),
-                                ),
-                                keyboardType: TextInputType.phone,
-                                enabled: !_isSaving,
-                              ),
-                              const Divider(),
-                            ],
-                          ],
-                        );
-                      },
-                      loading: () => const CircularProgressIndicator(),
-                      error: (e, s) => const Text('Error loading suppliers'),
-                    ),
-                    TextField(
-                      controller: _cratesController,
-                      decoration: const InputDecoration(labelText: 'Crates'),
-                      keyboardType: TextInputType.number,
-                      enabled: !_isSaving,
-                    ),
-                    TextField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Price per Crate',
-                      ),
-                      keyboardType: TextInputType.number,
-                      enabled: !_isSaving,
-                    ),
-                    TextField(
-                      controller: _transportController,
-                      decoration: const InputDecoration(
-                        labelText: 'Transport Cost',
-                      ),
-                      keyboardType: TextInputType.number,
-                      enabled: !_isSaving,
-                    ),
-                    TextField(
-                      controller: _otherController,
-                      decoration: const InputDecoration(
-                        labelText: 'Other Cost',
-                      ),
-                      keyboardType: TextInputType.number,
-                      enabled: !_isSaving,
-                    ),
-                    TextField(
-                      controller: _notesController,
-                      decoration: const InputDecoration(labelText: 'Notes'),
-                      enabled: !_isSaving,
-                    ),
-                    if (_isSaving) ...[
-                      const SizedBox(height: 20),
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 8),
-                      const Text('Saving...'),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _isSaving
-                      ? null
-                      : () {
-                          _isQuickAddingSupplier = false;
-                          _selectedSupplier = null;
-                          Navigator.pop(context);
-                        },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _isSaving
-                      ? null
-                      : () async {
-                          final cratesCount = int.tryParse(
-                            _cratesController.text,
-                          );
-                          final price = double.tryParse(_priceController.text);
-                          final transport =
-                              double.tryParse(_transportController.text) ?? 0.0;
-                          final other =
-                              double.tryParse(_otherController.text) ?? 0.0;
-
-                          if ((!_isQuickAddingSupplier &&
-                                  _selectedSupplier == null) ||
-                              (_isQuickAddingSupplier &&
-                                  _newNameController.text.isEmpty) ||
-                              cratesCount == null ||
-                              price == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Please fill all required fields correctly',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          setState(() => _isSaving = true);
-                          try {
-                            // 1. Handle Quick Add Supplier if needed
-                            if (_isQuickAddingSupplier) {
-                              final newSupplier = Supplier(
-                                name: _newNameController.text,
-                                phone: _newPhoneController.text,
-                                location: '',
-                                notes: 'Quick added during purchase',
-                                createdAt: DateTime.now(),
-                              );
-                              final id = await DatabaseHelper.instance
-                                  .createSupplier(newSupplier);
-                              _selectedSupplier = newSupplier.copyWith(id: id);
-                              await ref
-                                  .read(suppliersProvider.notifier)
-                                  .refresh();
-                            }
-
-                            final total =
-                                (cratesCount * price) + transport + other;
-                            final pos = await locationFuture;
-
-                            final purchase = Purchase(
-                              supplierId: _selectedSupplier!.id!,
-                              crates: cratesCount,
-                              remainingEggs:
-                                  cratesCount * 30, // Default to 30 eggs/crate
-                              buyingPricePerCrate: price,
-                              transportCost: transport,
-                              otherCost: other,
-                              totalCost: total,
-                              notes: _notesController.text,
-                              createdAt: _selectedDate,
-                              latitude: pos?.latitude ?? 0.0,
-                              longitude: pos?.longitude ?? 0.0,
-                            );
-
-                            await DatabaseHelper.instance.createPurchase(
-                              purchase,
-                            );
-                            ref.read(purchasesProvider.notifier).refresh();
-                            ref.invalidate(inventoryBalanceProvider);
-                            ref.invalidate(dashboardSummaryProvider);
-
-                            _cratesController.clear();
-                            _priceController.clear();
-                            _transportController.text = '0';
-                            _otherController.text = '0';
-                            _notesController.clear();
-                            _newNameController.clear();
-                            _newPhoneController.clear();
-                            _isQuickAddingSupplier = false;
-                            _selectedSupplier = null;
-                            _selectedDate = DateTime.now();
-
-                            if (!context.mounted) return;
-                            Navigator.pop(context);
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e')),
-                            );
-                          } finally {
-                            if (context.mounted)
-                              setState(() => _isSaving = false);
-                          }
-                        },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const _PurchaseFormPage()));
   }
 
   @override
@@ -310,10 +29,16 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
     final purchasesAsync = ref.watch(purchasesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Purchases')),
+      backgroundColor: InstaPalette.background,
+      appBar: AppBar(
+        title: const Text('Purchases', style: TextStyle(color: InstaPalette.textPrimary)),
+        backgroundColor: InstaPalette.background,
+        foregroundColor: InstaPalette.textPrimary,
+        elevation: 0.5,
+      ),
       body: purchasesAsync.when(
         data: (purchases) => purchases.isEmpty
-            ? const Center(child: Text('No purchases recorded.'))
+            ? const Center(child: Text('No purchases recorded.', style: TextStyle(color: InstaPalette.textSecondary)))
             : ListView.builder(
                 itemCount: purchases.length,
                 itemBuilder: (context, index) {
@@ -343,35 +68,263 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
                       }
                     },
                     child: Card(
+                      color: InstaPalette.cardBackground,
                       margin: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
                       ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
+                      elevation: 0,
                       child: ListTile(
                         title: Text(
                           '${p.crates} Crates @ \$${p.buyingPricePerCrate}',
+                          style: const TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
                           'Total: \$${p.totalCost.toStringAsFixed(2)}\n${DateFormat('yyyy-MM-dd HH:mm').format(p.createdAt)}',
+                          style: const TextStyle(color: InstaPalette.textSecondary),
                         ),
                         isThreeLine: true,
-                        trailing: const Icon(
-                          Icons.shopping_bag,
-                          color: Colors.green,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.print, color: InstaPalette.accent),
+                          onPressed: () async {
+                            final suppliers = await DatabaseHelper.instance.getAllSuppliers();
+                            final supplier = suppliers.firstWhere(
+                              (s) => s.id == p.supplierId,
+                              orElse: () => Supplier(
+                                id: p.supplierId,
+                                name: 'Unknown Supplier',
+                                phone: '',
+                                location: '',
+                                notes: '',
+                                createdAt: DateTime.now(),
+                              ),
+                            );
+
+                            final receiptData = ReceiptMapper.fromPurchase(p, supplier);
+                            if (!context.mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DesignerPage(
+                                  transactionData: receiptData,
+                                  isReadOnly: true,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
                   );
                 },
               ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () => const Center(child: CircularProgressIndicator(color: InstaPalette.accent)),
+        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddPurchaseDialog,
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add_shopping_cart),
+        backgroundColor: InstaPalette.textPrimary,
+        child: const Icon(Icons.add_shopping_cart, color: InstaPalette.background),
       ),
     );
+  }
+}
+
+class _PurchaseFormPage extends ConsumerStatefulWidget {
+  const _PurchaseFormPage();
+
+  @override
+  ConsumerState<_PurchaseFormPage> createState() => _PurchaseFormPageState();
+}
+
+class _PurchaseFormPageState extends ConsumerState<_PurchaseFormPage> {
+  final GlobalKey _dateFieldKey = GlobalKey();
+  final GlobalKey _supplierFieldKey = GlobalKey();
+  final GlobalKey _cratesFieldKey = GlobalKey();
+
+  final _cratesController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _transportController = TextEditingController(text: '0');
+  final _otherController = TextEditingController(text: '0');
+  final _notesController = TextEditingController();
+
+  final _newNameController = TextEditingController();
+  final _newPhoneController = TextEditingController();
+
+  Supplier? _selectedSupplier;
+  DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
+  bool _isQuickAddingSupplier = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final suppliersAsync = ref.watch(suppliersProvider);
+
+    return FullPageAddDialog(
+      title: 'New Purchase',
+      isSaving: _isSaving,
+      onSave: () async {
+        final cratesCount = int.tryParse(_cratesController.text);
+        final price = double.tryParse(_priceController.text);
+        final transport = double.tryParse(_transportController.text) ?? 0.0;
+        final other = double.tryParse(_otherController.text) ?? 0.0;
+
+        if ((!_isQuickAddingSupplier && _selectedSupplier == null) ||
+            (_isQuickAddingSupplier && _newNameController.text.isEmpty) ||
+            cratesCount == null ||
+            price == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please fill all required fields correctly')),
+          );
+          return;
+        }
+
+        setState(() => _isSaving = true);
+        try {
+          Supplier? supplierToUse = _selectedSupplier;
+          if (_isQuickAddingSupplier) {
+            final newSupplier = Supplier(
+              name: _newNameController.text,
+              phone: _newPhoneController.text,
+              location: '',
+              notes: 'Quick added during purchase',
+              createdAt: DateTime.now(),
+            );
+            final id = await DatabaseHelper.instance.createSupplier(newSupplier);
+            supplierToUse = newSupplier.copyWith(id: id);
+            await ref.read(suppliersProvider.notifier).refresh();
+          }
+
+          final total = (cratesCount * price) + transport + other;
+          final pos = await LocationService.getCurrentLocation();
+
+          final purchase = Purchase(
+            supplierId: supplierToUse!.id!,
+            crates: cratesCount,
+            remainingEggs: cratesCount * 30,
+            buyingPricePerCrate: price,
+            transportCost: transport,
+            otherCost: other,
+            totalCost: total,
+            notes: _notesController.text,
+            createdAt: _selectedDate,
+            latitude: pos?.latitude ?? 0.0,
+            longitude: pos?.longitude ?? 0.0,
+          );
+
+          await DatabaseHelper.instance.createPurchase(purchase);
+          ref.read(purchasesProvider.notifier).refresh();
+          ref.invalidate(inventoryBalanceProvider);
+          ref.invalidate(dashboardSummaryProvider);
+
+          if (!context.mounted) return;
+          Navigator.pop(context);
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        } finally {
+          if (mounted) setState(() => _isSaving = false);
+        }
+      },
+      child: Column(
+        children: [
+          ListTile(
+            key: _dateFieldKey,
+            title: Text(
+              'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+              style: const TextStyle(color: InstaPalette.textPrimary),
+            ),
+            trailing: const Icon(Icons.calendar_today, color: InstaPalette.textPrimary),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2023),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+          ),
+          Container(
+            key: _supplierFieldKey,
+            child: suppliersAsync.when(
+              data: (list) {
+                return Column(
+                  children: [
+                    DropdownButtonFormField<dynamic>(
+                      value: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
+                      decoration: const InputDecoration(labelText: 'Supplier', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
+                      items: [
+                        ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
+                        const DropdownMenuItem(
+                          value: 'ADD_NEW',
+                          child: Row(children: [Icon(Icons.add, color: InstaPalette.accent), SizedBox(width: 8), Text('Add New Supplier', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val == 'ADD_NEW') {
+                          setState(() { _isQuickAddingSupplier = true; _selectedSupplier = null; });
+                        } else {
+                          setState(() { _isQuickAddingSupplier = false; _selectedSupplier = val as Supplier; });
+                        }
+                      },
+                    ),
+                    if (_isQuickAddingSupplier) ...[
+                      TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+                      TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
+                      const Divider(),
+                    ],
+                  ],
+                );
+              },
+              loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
+              error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
+            ),
+          ),
+          TextField(key: _cratesFieldKey, controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _transportController, decoration: const InputDecoration(labelText: 'Transport Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _otherController, decoration: const InputDecoration(labelText: 'Other Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showPurchaseTutorial());
+  }
+
+  void _showPurchaseTutorial() {
+    final targets = <TargetFocus>[
+      TargetFocus(
+        identify: "date",
+        keyTarget: _dateFieldKey,
+        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Select the date of the purchase.", style: TextStyle(color: Colors.white, fontSize: 16)))],
+      ),
+      TargetFocus(
+        identify: "supplier",
+        keyTarget: _supplierFieldKey,
+        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Select or add a new supplier.", style: TextStyle(color: Colors.white, fontSize: 16)))],
+      ),
+      TargetFocus(
+        identify: "crates",
+        keyTarget: _cratesFieldKey,
+        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Enter the number of crates purchased.", style: TextStyle(color: Colors.white, fontSize: 16)))],
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: Colors.black,
+      textSkip: "SKIP",
+      paddingFocus: 10,
+      opacityShadow: 0.6,
+    ).show(context: context);
   }
 }

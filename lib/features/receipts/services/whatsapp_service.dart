@@ -1,5 +1,4 @@
 // lib/features/receipts/services/whatsapp_service.dart
-import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -17,6 +16,6 @@ class WhatsAppService {
   /// Share a file (PDF) to WhatsApp
   static Future<void> shareReceiptFile(String filePath) async {
     final file = XFile(filePath);
-    await Share.shareXFiles([file], text: 'Here is your receipt.');
+    await Share.instance.shareXFiles([file], text: 'Here is your receipt.');
   }
 }

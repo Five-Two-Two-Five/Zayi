@@ -50,16 +50,16 @@ class Purchase {
     return Purchase(
       id: map['id'],
       supplierId: map['supplier_id'],
-      crates: map['trays'],
+      crates: map['trays'] ?? 0,
       remainingEggs: map['remaining_eggs'] ?? 0,
-      buyingPricePerCrate: (map['buying_price_per_tray'] as num).toDouble(),
-      transportCost: (map['transport_cost'] as num).toDouble(),
-      otherCost: (map['other_cost'] as num).toDouble(),
-      totalCost: (map['total_cost'] as num).toDouble(),
-      notes: map['notes'],
-      createdAt: DateTime.parse(map['created_at']),
-      latitude: map['latitude'],
-      longitude: map['longitude'],
+      buyingPricePerCrate: (map['buying_price_per_tray'] as num?)?.toDouble() ?? 0.0,
+      transportCost: (map['transport_cost'] as num?)?.toDouble() ?? 0.0,
+      otherCost: (map['other_cost'] as num?)?.toDouble() ?? 0.0,
+      totalCost: (map['total_cost'] as num?)?.toDouble() ?? 0.0,
+      notes: map['notes'] ?? '',
+      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      latitude: (map['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (map['longitude'] as num?)?.toDouble() ?? 0.0,
     );
   }
 

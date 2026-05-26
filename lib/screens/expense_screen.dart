@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/expense.dart';
 import '../providers/providers.dart';
 import '../database/database_helper.dart';
-import '../services/location_service.dart';
 import 'package:intl/intl.dart';
+import '../theme/insta_theme.dart';
+import '../widgets/full_page_add_dialog.dart';
 
 class ExpenseScreen extends ConsumerStatefulWidget {
   const ExpenseScreen({super.key});
@@ -14,144 +15,8 @@ class ExpenseScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
-  final _amountController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _employeeNameController = TextEditingController();
-  final _extraDetailsController = TextEditingController();
-  String _selectedType = 'General';
-  DateTime _selectedDate = DateTime.now();
-  bool _isSaving = false;
-
-  final List<String> _expenseTypes = ['General', 'Delivery', 'Employee'];
-
   void _showAddExpenseDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Record Expense'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: Text(
-                    'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime(2023),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => _selectedDate = picked);
-                    }
-                  },
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedType,
-                  decoration: const InputDecoration(labelText: 'Expense Type'),
-                  items: _expenseTypes
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
-                  onChanged: (val) => setState(() => _selectedType = val!),
-                ),
-                if (_selectedType == 'Employee')
-                  TextField(
-                    controller: _employeeNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Employee Name',
-                    ),
-                    enabled: !_isSaving,
-                  ),
-                if (_selectedType == 'Delivery')
-                  TextField(
-                    controller: _extraDetailsController,
-                    decoration: const InputDecoration(
-                      labelText: 'Vehicle / Route Details',
-                    ),
-                    enabled: !_isSaving,
-                  ),
-                TextField(
-                  controller: _amountController,
-                  decoration: const InputDecoration(labelText: 'Amount'),
-                  keyboardType: TextInputType.number,
-                  enabled: !_isSaving,
-                ),
-                TextField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (Optional)',
-                  ),
-                  enabled: !_isSaving,
-                ),
-                if (_isSaving) ...[
-                  const SizedBox(height: 20),
-                  const CircularProgressIndicator(),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: _isSaving ? null : () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: _isSaving
-                  ? null
-                  : () async {
-                      final amt = double.tryParse(_amountController.text);
-                      if (amt == null) return;
-
-                      setState(() => _isSaving = true);
-                      try {
-                        final expense = Expense(
-                          expenseType: _selectedType,
-                          amount: amt,
-                          description: _descriptionController.text,
-                          employeeName: _selectedType == 'Employee'
-                              ? _employeeNameController.text
-                              : null,
-                          extraDetails: _selectedType == 'Delivery'
-                              ? _extraDetailsController.text
-                              : null,
-                          createdAt: _selectedDate,
-                          latitude: 0.0,
-                          longitude: 0.0,
-                        );
-
-                        await DatabaseHelper.instance.createExpense(expense);
-                        ref.read(expensesProvider.notifier).refresh();
-                        ref.invalidate(dashboardSummaryProvider);
-
-                        _amountController.clear();
-                        _descriptionController.clear();
-                        _employeeNameController.clear();
-                        _extraDetailsController.clear();
-                        _selectedDate = DateTime.now();
-
-                        if (!context.mounted) return;
-                        Navigator.pop(context);
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-                      } finally {
-                        if (context.mounted) setState(() => _isSaving = false);
-                      }
-                    },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const _ExpenseFormPage()));
   }
 
   @override
@@ -159,10 +24,16 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
     final expensesAsync = ref.watch(expensesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses')),
+      backgroundColor: InstaPalette.background,
+      appBar: AppBar(
+        title: const Text('Expenses', style: TextStyle(color: InstaPalette.textPrimary)),
+        backgroundColor: InstaPalette.background,
+        foregroundColor: InstaPalette.textPrimary,
+        elevation: 0.5,
+      ),
       body: expensesAsync.when(
         data: (expenses) => expenses.isEmpty
-            ? const Center(child: Text('No expenses recorded.'))
+            ? const Center(child: Text('No expenses recorded.', style: TextStyle(color: InstaPalette.textSecondary)))
             : ListView.builder(
                 itemCount: expenses.length,
                 itemBuilder: (context, index) {
@@ -190,23 +61,28 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                       ref.invalidate(dashboardSummaryProvider);
                     },
                     child: Card(
+                      color: InstaPalette.cardBackground,
                       margin: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 6,
                       ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
+                      elevation: 0,
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: _getColorForType(e.expenseType),
                           child: const Icon(
                             Icons.money_off,
-                            color: Colors.white,
+                            color: InstaPalette.background,
                           ),
                         ),
                         title: Text(
                           '${e.expenseType}: \$${e.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
                           '$subtitleText\n${DateFormat('yyyy-MM-dd').format(e.createdAt)}',
+                          style: const TextStyle(color: InstaPalette.textSecondary),
                         ),
                         isThreeLine: true,
                       ),
@@ -214,13 +90,13 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
                   );
                 },
               ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () => const Center(child: CircularProgressIndicator(color: InstaPalette.accent)),
+        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddExpenseDialog,
-        backgroundColor: Colors.red,
-        child: const Icon(Icons.add),
+        backgroundColor: InstaPalette.textPrimary,
+        child: const Icon(Icons.add, color: InstaPalette.background),
       ),
     );
   }
@@ -232,7 +108,98 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> {
       case 'Employee':
         return Colors.deepPurple;
       default:
-        return Colors.red;
+        return InstaPalette.accent;
     }
+  }
+}
+
+class _ExpenseFormPage extends ConsumerStatefulWidget {
+  const _ExpenseFormPage();
+
+  @override
+  ConsumerState<_ExpenseFormPage> createState() => _ExpenseFormPageState();
+}
+
+class _ExpenseFormPageState extends ConsumerState<_ExpenseFormPage> {
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _employeeNameController = TextEditingController();
+  final _extraDetailsController = TextEditingController();
+  String _selectedType = 'General';
+  DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
+
+  final List<String> _expenseTypes = ['General', 'Delivery', 'Employee'];
+
+  @override
+  Widget build(BuildContext context) {
+    return FullPageAddDialog(
+      title: 'Record Expense',
+      isSaving: _isSaving,
+      onSave: () async {
+        final amt = double.tryParse(_amountController.text);
+        if (amt == null) return;
+
+        setState(() => _isSaving = true);
+        try {
+          final expense = Expense(
+            expenseType: _selectedType,
+            amount: amt,
+            description: _descriptionController.text,
+            employeeName: _selectedType == 'Employee' ? _employeeNameController.text : null,
+            extraDetails: _selectedType == 'Delivery' ? _extraDetailsController.text : null,
+            createdAt: _selectedDate,
+            latitude: 0.0,
+            longitude: 0.0,
+          );
+
+          await DatabaseHelper.instance.createExpense(expense);
+          ref.read(expensesProvider.notifier).refresh();
+          ref.invalidate(dashboardSummaryProvider);
+
+          if (!context.mounted) return;
+          Navigator.pop(context);
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        } finally {
+          if (mounted) setState(() => _isSaving = false);
+        }
+      },
+      child: Column(
+        children: [
+          ListTile(
+            title: Text(
+              'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+              style: const TextStyle(color: InstaPalette.textPrimary),
+            ),
+            trailing: const Icon(Icons.calendar_today, color: InstaPalette.textPrimary),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2023),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+          ),
+          DropdownButtonFormField<String>(
+            value: _selectedType,
+            decoration: const InputDecoration(labelText: 'Expense Type', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
+            items: _expenseTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: InstaPalette.textPrimary)))).toList(),
+            onChanged: (val) => setState(() => _selectedType = val!),
+          ),
+          if (_selectedType == 'Employee')
+            TextField(controller: _employeeNameController, decoration: const InputDecoration(labelText: 'Employee Name', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
+          if (_selectedType == 'Delivery')
+            TextField(controller: _extraDetailsController, decoration: const InputDecoration(labelText: 'Vehicle / Route Details', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
+          TextField(controller: _amountController, decoration: const InputDecoration(labelText: 'Amount', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number, enabled: !_isSaving),
+          TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Description (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
+        ],
+      ),
+    );
   }
 }

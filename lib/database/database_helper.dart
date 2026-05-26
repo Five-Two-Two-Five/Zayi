@@ -25,22 +25,32 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 4) {
-      // For a "clean slate" as requested, we drop and recreate
-      await db.execute('DROP TABLE IF EXISTS suppliers');
-      await db.execute('DROP TABLE IF EXISTS customers');
-      await db.execute('DROP TABLE IF EXISTS purchases');
-      await db.execute('DROP TABLE IF EXISTS sales');
-      await db.execute('DROP TABLE IF EXISTS expenses');
-      await db.execute('DROP TABLE IF EXISTS inventory');
-      await _createDB(db, 4);
+    if (oldVersion < 5) {
+      await _addColumnIfNotExists(db, 'sales', 'delivery_cost', 'REAL DEFAULT 0');
+    }
+    
+    if (oldVersion < 6) {
+      await _addColumnIfNotExists(db, 'sales', 'employee_cost', 'REAL DEFAULT 0');
+    }
+
+    if (oldVersion < 7) {
+      await _addColumnIfNotExists(db, 'expenses', 'latitude', 'REAL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'expenses', 'longitude', 'REAL DEFAULT 0');
+    }
+  }
+
+  Future<void> _addColumnIfNotExists(Database db, String table, String column, String type) async {
+    final result = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = result.any((row) => row['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
     }
   }
 
@@ -52,7 +62,7 @@ class DatabaseHelper {
     const textTypeNullable = 'TEXT';
 
     await db.execute('''
-      CREATE TABLE suppliers (
+      CREATE TABLE IF NOT EXISTS suppliers (
         id $idType,
         name $textType,
         phone $textType,
@@ -63,7 +73,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE customers (
+      CREATE TABLE IF NOT EXISTS customers (
         id $idType,
         name $textType,
         phone $textType,
@@ -74,7 +84,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE purchases (
+      CREATE TABLE IF NOT EXISTS purchases (
         id $idType,
         supplier_id $intType,
         trays $intType,
@@ -92,12 +102,14 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE sales (
+      CREATE TABLE IF NOT EXISTS sales (
         id $idType,
         customer_id $intType,
         trays_sold $intType,
         eggs_sold $intType,
         selling_price_per_tray $realType,
+        delivery_cost $realType DEFAULT 0,
+        employee_cost $realType DEFAULT 0,
         total_revenue $realType,
         total_cost $realType,
         profit $realType,
@@ -112,19 +124,21 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE expenses (
+      CREATE TABLE IF NOT EXISTS expenses (
         id $idType,
         expense_type $textType,
         amount $realType,
         description $textType,
         employee_name $textTypeNullable,
         extra_details $textTypeNullable,
-        created_at $textType
+        created_at $textType,
+        latitude $realType,
+        longitude $realType
       )
     ''');
 
     await db.execute('''
-      CREATE TABLE inventory (
+      CREATE TABLE IF NOT EXISTS inventory (
         id $idType,
         trays_in $intType,
         trays_out $intType,
@@ -134,14 +148,14 @@ class DatabaseHelper {
     ''');
 
     await db.execute(
-      'CREATE INDEX idx_inventory_created_at ON inventory(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_inventory_created_at ON inventory(created_at)',
     );
     await db.execute(
-      'CREATE INDEX idx_purchases_created_at ON purchases(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_purchases_created_at ON purchases(created_at)',
     );
-    await db.execute('CREATE INDEX idx_sales_created_at ON sales(created_at)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales(created_at)');
     await db.execute(
-      'CREATE INDEX idx_expenses_created_at ON expenses(created_at)',
+      'CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at)',
     );
   }
 
@@ -319,6 +333,16 @@ class DatabaseHelper {
     return result.map((json) => Sale.fromMap(json)).toList();
   }
 
+  Future<int> updateSale(Sale sale) async {
+    final db = await instance.database;
+    return await db.update(
+      'sales',
+      sale.toMap(),
+      where: 'id = ?',
+      whereArgs: [sale.id],
+    );
+  }
+
   // Expenses
   Future<int> createExpense(Expense expense) async {
     final db = await instance.database;
@@ -402,10 +426,11 @@ class DatabaseHelper {
       final amt = (row['total'] as num?)?.toDouble() ?? 0.0;
       if (type == 'Delivery') {
         deliveryCosts += amt;
-      } else if (type == 'Employee')
+      } else if (type == 'Employee') {
         employeeCosts += amt;
-      else
+      } else {
         otherExpenses += amt;
+      }
     }
 
     final inventoryValue = await getInventoryValue();
