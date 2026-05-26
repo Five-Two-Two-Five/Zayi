@@ -6,6 +6,7 @@ import '../models/purchase.dart';
 import '../models/sale.dart';
 import '../models/expense.dart';
 import '../models/inventory.dart';
+import '../models/fixed_asset.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -25,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -43,6 +44,33 @@ class DatabaseHelper {
     if (oldVersion < 7) {
       await _addColumnIfNotExists(db, 'expenses', 'latitude', 'REAL DEFAULT 0');
       await _addColumnIfNotExists(db, 'expenses', 'longitude', 'REAL DEFAULT 0');
+    }
+
+    if (oldVersion < 8) {
+      await _addColumnIfNotExists(db, 'sales', 'tax_rate', 'REAL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'sales', 'tax_amount', 'REAL DEFAULT 0');
+      
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fixed_assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          purchase_price REAL NOT NULL,
+          purchase_date TEXT NOT NULL,
+          useful_life_months INTEGER NOT NULL,
+          residual_value REAL NOT NULL,
+          notes TEXT
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS equity_ledger (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type TEXT NOT NULL,
+          amount REAL NOT NULL,
+          notes TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -110,6 +138,8 @@ class DatabaseHelper {
         selling_price_per_tray $realType,
         delivery_cost $realType DEFAULT 0,
         employee_cost $realType DEFAULT 0,
+        tax_rate $realType DEFAULT 0,
+        tax_amount $realType DEFAULT 0,
         total_revenue $realType,
         total_cost $realType,
         profit $realType,
@@ -143,6 +173,28 @@ class DatabaseHelper {
         trays_in $intType,
         trays_out $intType,
         balance $intType,
+        created_at $textType
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS fixed_assets (
+        id $idType,
+        name $textType,
+        purchase_price $realType,
+        purchase_date $textType,
+        useful_life_months $intType,
+        residual_value $realType,
+        notes $textTypeNullable
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS equity_ledger (
+        id $idType,
+        type $textType,
+        amount $realType,
+        notes $textTypeNullable,
         created_at $textType
       )
     ''');
@@ -368,6 +420,45 @@ class DatabaseHelper {
     return result.map((json) => Inventory.fromMap(json)).toList();
   }
 
+  // Fixed Assets
+  Future<int> createFixedAsset(Map<String, dynamic> asset) async {
+    final db = await instance.database;
+    return await db.insert('fixed_assets', asset);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllFixedAssets() async {
+    final db = await instance.database;
+    return await db.query('fixed_assets', orderBy: 'purchase_date DESC');
+  }
+
+  Future<int> deleteFixedAsset(int id) async {
+    final db = await instance.database;
+    return await db.delete('fixed_assets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Equity Ledger
+  Future<int> createEquityTransaction(Map<String, dynamic> transaction) async {
+    final db = await instance.database;
+    return await db.insert('equity_ledger', transaction);
+  }
+
+  Future<List<Map<String, dynamic>>> getAllEquityTransactions() async {
+    final db = await instance.database;
+    return await db.query('equity_ledger', orderBy: 'created_at DESC');
+  }
+
+  Future<double> getTotalEquity() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT type, SUM(amount) as total FROM equity_ledger GROUP BY type');
+    double contribution = 0;
+    double drawing = 0;
+    for (var row in result) {
+      if (row['type'] == 'CONTRIBUTION') contribution = (row['total'] as num).toDouble();
+      if (row['type'] == 'DRAWING') drawing = (row['total'] as num).toDouble();
+    }
+    return contribution - drawing;
+  }
+
   // Metrics
   Future<double> getInventoryValue() async {
     final db = await instance.database;
@@ -414,7 +505,7 @@ class DatabaseHelper {
     }
 
     final salesResult = await db.rawQuery(
-      'SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance FROM sales '
+      'SELECT SUM(total_revenue) as revenue, SUM(profit) as profit, SUM(balance_due) as balance, SUM(tax_amount) as tax FROM sales '
       '$dateFilter',
     );
 
@@ -427,6 +518,7 @@ class DatabaseHelper {
     double revenue = (salesResult.first['revenue'] as num?)?.toDouble() ?? 0.0;
     double profit = (salesResult.first['profit'] as num?)?.toDouble() ?? 0.0;
     double balance = (salesResult.first['balance'] as num?)?.toDouble() ?? 0.0;
+    double taxLiability = (salesResult.first['tax'] as num?)?.toDouble() ?? 0.0;
 
     double deliveryCosts = 0.0;
     double employeeCosts = 0.0;
@@ -444,8 +536,29 @@ class DatabaseHelper {
       }
     }
 
+    // Calculate Depreciation for the range
+    double depreciationExpense = 0.0;
+    final allAssetsMaps = await getAllFixedAssets();
+    final allAssets = allAssetsMaps.map((m) => FixedAsset.fromMap(m)).toList();
+    
+    final rangeStart = start ?? DateTime(2023);
+    final rangeEnd = end ?? DateTime.now();
+
+    for (var asset in allAssets) {
+      // Check if asset was owned during the range
+      if (asset.purchaseDate.isBefore(rangeEnd)) {
+        final effectiveStart = asset.purchaseDate.isAfter(rangeStart) ? asset.purchaseDate : rangeStart;
+        final daysOwnedInRange = rangeEnd.difference(effectiveStart).inDays + 1;
+        
+        // Simple straight-line daily depreciation
+        final dailyDepr = asset.monthlyDepreciation / 30;
+        depreciationExpense += dailyDepr * daysOwnedInRange;
+      }
+    }
+
     final inventoryValue = await getInventoryValue();
     final totalDebt = await getTotalCustomerDebt();
+    final totalEquity = await getTotalEquity();
 
     return {
       'revenue': revenue,
@@ -454,13 +567,16 @@ class DatabaseHelper {
           deliveryCosts +
           employeeCosts +
           otherExpenses, // Profit before overheads
-      'net_profit': profit - otherExpenses, // Final profit after all costs
+      'net_profit': profit - otherExpenses - depreciationExpense, // Final profit after all costs including depr.
       'delivery_costs': deliveryCosts,
       'employee_costs': employeeCosts,
       'other_expenses': otherExpenses,
       'inventory_value': inventoryValue,
       'total_debt': totalDebt,
       'new_debt': balance,
+      'tax_liability': taxLiability,
+      'depreciation': depreciationExpense,
+      'total_equity': totalEquity,
     };
   }
 

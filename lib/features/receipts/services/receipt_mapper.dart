@@ -16,10 +16,11 @@ class ReceiptMapper {
         {
           'name': 'Sale Item',
           'qty': sale.cratesSold,
-          'total': sale.totalRevenue.toStringAsFixed(2),
+          'total': (sale.totalRevenue - sale.taxAmount).toStringAsFixed(2),
         },
       ],
-      'subTotal': sale.totalRevenue.toStringAsFixed(2),
+      'tax': sale.taxAmount.toStringAsFixed(2),
+      'subTotal': (sale.totalRevenue - sale.taxAmount).toStringAsFixed(2),
       'total': sale.totalRevenue.toStringAsFixed(2),
       'cash': sale.amountPaid.toStringAsFixed(2),
       'balance': sale.balanceDue.toStringAsFixed(2),

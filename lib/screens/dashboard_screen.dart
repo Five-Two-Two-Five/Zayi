@@ -28,10 +28,6 @@ class DashboardScreen extends ConsumerWidget {
     final dateRange = ref.watch(dashboardDateRangeProvider);
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showTutorial(context),
-        child: const Icon(Icons.help_outline),
-      ),
       backgroundColor: InstaPalette.background,
       appBar: AppBar(
         title: const Text('ZAYI INTEL', style: TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold)),
@@ -140,6 +136,22 @@ class DashboardScreen extends ConsumerWidget {
                   Expanded(child: _buildSummaryCard('Other Expenses', summaryAsync, (d) => '\$${d['other_expenses']?.toStringAsFixed(2)}')),
                 ],
               ),
+              const SizedBox(height: 16),
+              // Audit Rows
+              Row(
+                children: [
+                  Expanded(child: _buildSummaryCard('Tax Liability', summaryAsync, (d) => '\$${d['tax_liability']?.toStringAsFixed(2)}')),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildSummaryCard('Depreciation', summaryAsync, (d) => '\$${d['depreciation']?.toStringAsFixed(2)}')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildSummaryCard('Owner Equity', summaryAsync, (d) => '\$${d['total_equity']?.toStringAsFixed(2)}')),
+                  const Spacer(),
+                ],
+              ),
               const SizedBox(height: 32),
               Row(
                 children: [
@@ -164,6 +176,8 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildLargeButton(context, 'RECORD EXPENSE', Icons.money_off, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()))),
                     const SizedBox(height: 12),
+                    _buildLargeButton(context, 'RECORD EQUITY', Icons.account_balance_wallet, () => QuickAddDialogs.showEquityDialog(context, ref)),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(child: _buildLargeButton(context, 'SUPPLIER', Icons.person_add, () => QuickAddDialogs.showAddSupplierDialog(context, ref))),
@@ -186,65 +200,6 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
-
-  void _showTutorial(BuildContext context) {
-    final targets = <TargetFocus>[
-      TargetFocus(
-        identify: "inventory",
-        keyTarget: _inventoryKey,
-        shape: ShapeLightFocus.RRect,
-        radius: 12,
-        contents: [
-          TargetContent(
-            align: ContentAlign.bottom,
-            child: const Text(
-              "Inventory Overview:\n\nMonitor your total available stock and current market value here.",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      TargetFocus(
-        identify: "quickActions",
-        keyTarget: _quickActionsKey,
-        shape: ShapeLightFocus.RRect,
-        radius: 8,
-        contents: [
-          TargetContent(
-            align: ContentAlign.top,
-            child: const Text(
-              "Quick Actions:\n\nEasily record purchases, sales, and expenses, or manage your suppliers and customers.",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      TargetFocus(
-        identify: "saleButton",
-        keyTarget: _saleButtonKey,
-        shape: ShapeLightFocus.RRect,
-        radius: 8,
-        contents: [
-          TargetContent(
-            align: ContentAlign.top,
-            child: const Text(
-              "New Sale:\n\nTap here to initiate a new sale record, update inventory, and manage payments.",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    ];
-
-    TutorialCoachMark(
-      targets: targets,
-      colorShadow: Colors.black, // Dark overlay
-      textSkip: "SKIP",
-      paddingFocus: 10,
-      opacityShadow: 0.6, // More transparent
-    ).show(context: context);
-  }
-
 
   Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap}) {
     return Card(

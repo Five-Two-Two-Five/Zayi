@@ -6,6 +6,8 @@ class Sale {
   final double sellingPricePerCrate;
   final double deliveryCost;
   final double employeeCost;
+  final double taxRate;
+  final double taxAmount;
   final double totalRevenue;
   final double totalCost;
   final double profit;
@@ -24,6 +26,8 @@ class Sale {
     required this.sellingPricePerCrate,
     required this.deliveryCost,
     required this.employeeCost,
+    required this.taxRate,
+    required this.taxAmount,
     required this.totalRevenue,
     required this.totalCost,
     required this.profit,
@@ -46,6 +50,8 @@ class Sale {
       'selling_price_per_tray': sellingPricePerCrate,
       'delivery_cost': deliveryCost,
       'employee_cost': employeeCost,
+      'tax_rate': taxRate,
+      'tax_amount': taxAmount,
       'total_revenue': totalRevenue,
       'total_cost': totalCost,
       'profit': profit,
@@ -67,6 +73,8 @@ class Sale {
       sellingPricePerCrate: (map['selling_price_per_tray'] as num?)?.toDouble() ?? 0.0,
       deliveryCost: (map['delivery_cost'] as num?)?.toDouble() ?? 0.0,
       employeeCost: (map['employee_cost'] as num?)?.toDouble() ?? 0.0,
+      taxRate: (map['tax_rate'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (map['tax_amount'] as num?)?.toDouble() ?? 0.0,
       totalRevenue: (map['total_revenue'] as num?)?.toDouble() ?? 0.0,
       totalCost: (map['total_cost'] as num?)?.toDouble() ?? 0.0,
       profit: (map['profit'] as num?)?.toDouble() ?? 0.0,
@@ -87,6 +95,8 @@ class Sale {
     double? sellingPricePerCrate,
     double? deliveryCost,
     double? employeeCost,
+    double? taxRate,
+    double? taxAmount,
     double? totalRevenue,
     double? totalCost,
     double? profit,
@@ -105,6 +115,8 @@ class Sale {
       sellingPricePerCrate: sellingPricePerCrate ?? this.sellingPricePerCrate,
       deliveryCost: deliveryCost ?? this.deliveryCost,
       employeeCost: employeeCost ?? this.employeeCost,
+      taxRate: taxRate ?? this.taxRate,
+      taxAmount: taxAmount ?? this.taxAmount,
       totalRevenue: totalRevenue ?? this.totalRevenue,
       totalCost: totalCost ?? this.totalCost,
       profit: profit ?? this.profit,

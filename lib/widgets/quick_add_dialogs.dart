@@ -7,6 +7,8 @@ import '../database/database_helper.dart';
 import '../theme/insta_theme.dart';
 import 'full_page_add_dialog.dart';
 
+import '../models/equity_transaction.dart';
+
 class QuickAddDialogs {
   static void showAddSupplierDialog(BuildContext context, WidgetRef ref) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => _SupplierForm()));
@@ -14,6 +16,72 @@ class QuickAddDialogs {
 
   static void showAddCustomerDialog(BuildContext context, WidgetRef ref) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => _CustomerForm()));
+  }
+
+  static void showEquityDialog(BuildContext context, WidgetRef ref) {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const _EquityForm()));
+  }
+}
+
+class _EquityForm extends ConsumerStatefulWidget {
+  const _EquityForm();
+
+  @override
+  ConsumerState<_EquityForm> createState() => _EquityFormState();
+}
+
+class _EquityFormState extends ConsumerState<_EquityForm> {
+  final amountController = TextEditingController();
+  final notesController = TextEditingController();
+  EquityType selectedType = EquityType.contribution;
+  bool isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FullPageAddDialog(
+      title: 'Record Equity Transaction',
+      isSaving: isSaving,
+      onSave: () async {
+        final amount = double.tryParse(amountController.text);
+        if (amount != null && amount > 0) {
+          setState(() => isSaving = true);
+          try {
+            final tx = EquityTransaction(
+              type: selectedType,
+              amount: amount,
+              notes: notesController.text,
+              createdAt: DateTime.now(),
+            );
+            await DatabaseHelper.instance.createEquityTransaction(tx.toMap());
+            ref.read(equityProvider.notifier).refresh();
+            ref.invalidate(dashboardSummaryProvider);
+            if (!context.mounted) return;
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Equity transaction recorded')));
+          } catch (e) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          } finally {
+            if (mounted) setState(() => isSaving = false);
+          }
+        }
+      },
+      child: Column(
+        children: [
+          DropdownButtonFormField<EquityType>(
+            value: selectedType,
+            decoration: const InputDecoration(labelText: 'Transaction Type', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
+            items: const [
+              DropdownMenuItem(value: EquityType.contribution, child: Text('Capital Contribution (In)', style: TextStyle(color: InstaPalette.textPrimary))),
+              DropdownMenuItem(value: EquityType.drawing, child: Text('Owner Drawing (Out)', style: TextStyle(color: InstaPalette.textPrimary))),
+            ],
+            onChanged: (val) => setState(() => selectedType = val!),
+          ),
+          TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Amount', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+        ],
+      ),
+    );
   }
 }
 

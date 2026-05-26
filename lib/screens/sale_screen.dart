@@ -195,6 +195,7 @@ class _SaleFormPage extends ConsumerStatefulWidget {
 class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
   final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
+  final _taxRateController = TextEditingController(text: '0');
   final _paidController = TextEditingController();
   final _notesController = TextEditingController();
 
@@ -216,6 +217,7 @@ class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
       onSave: () async {
         final cratesCount = int.tryParse(_cratesController.text);
         final price = double.tryParse(_priceController.text);
+        final taxRate = double.tryParse(_taxRateController.text) ?? 0.0;
         final paid = double.tryParse(_paidController.text.isEmpty ? '0' : _paidController.text) ?? 0.0;
 
         if ((!_isQuickAddingCustomer && _selectedCustomer == null) ||
@@ -245,6 +247,7 @@ class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
           }
 
           final revenue = cratesCount * price;
+          final taxAmount = revenue * (taxRate / 100);
           final pos = await LocationService.getCurrentLocation();
 
           final sale = Sale(
@@ -254,6 +257,8 @@ class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
             sellingPricePerCrate: price,
             deliveryCost: 0,
             employeeCost: 0,
+            taxRate: taxRate,
+            taxAmount: taxAmount,
             totalRevenue: revenue,
             totalCost: 0,
             profit: 0,
@@ -343,6 +348,7 @@ class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
           ),
           TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates Sold', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _taxRateController, decoration: const InputDecoration(labelText: 'Tax Rate (%)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _paidController, decoration: const InputDecoration(labelText: 'Amount Paid', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
         ],

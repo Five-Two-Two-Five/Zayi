@@ -6,6 +6,8 @@ import '../models/customer.dart';
 import '../models/purchase.dart';
 import '../models/sale.dart';
 import '../models/expense.dart';
+import '../models/fixed_asset.dart';
+import '../models/equity_transaction.dart';
 
 // Suppliers Provider
 final suppliersProvider = AsyncNotifierProvider<SuppliersNotifier, List<Supplier>>(() {
@@ -89,6 +91,42 @@ class ExpensesNotifier extends AsyncNotifier<List<Expense>> {
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => DatabaseHelper.instance.getAllExpenses());
+  }
+}
+
+// Assets Provider
+final assetsProvider = AsyncNotifierProvider<AssetsNotifier, List<FixedAsset>>(() {
+  return AssetsNotifier();
+});
+
+class AssetsNotifier extends AsyncNotifier<List<FixedAsset>> {
+  @override
+  Future<List<FixedAsset>> build() async {
+    final maps = await DatabaseHelper.instance.getAllFixedAssets();
+    return maps.map((m) => FixedAsset.fromMap(m)).toList();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => build());
+  }
+}
+
+// Equity Provider
+final equityProvider = AsyncNotifierProvider<EquityNotifier, List<EquityTransaction>>(() {
+  return EquityNotifier();
+});
+
+class EquityNotifier extends AsyncNotifier<List<EquityTransaction>> {
+  @override
+  Future<List<EquityTransaction>> build() async {
+    final maps = await DatabaseHelper.instance.getAllEquityTransactions();
+    return maps.map((m) => EquityTransaction.fromMap(m)).toList();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => build());
   }
 }
 
