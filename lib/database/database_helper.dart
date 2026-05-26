@@ -26,7 +26,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -69,6 +69,20 @@ class DatabaseHelper {
           amount REAL NOT NULL,
           notes TEXT,
           created_at TEXT NOT NULL
+        )
+      ''');
+    }
+
+    if (oldVersion < 9) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS receipt_settings (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          business_name TEXT,
+          address TEXT,
+          tax_id TEXT,
+          phone TEXT,
+          email TEXT,
+          footer_note TEXT
         )
       ''');
     }
@@ -196,6 +210,18 @@ class DatabaseHelper {
         amount $realType,
         notes $textTypeNullable,
         created_at $textType
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS receipt_settings (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        business_name TEXT,
+        address TEXT,
+        tax_id TEXT,
+        phone TEXT,
+        email TEXT,
+        footer_note TEXT
       )
     ''');
 
@@ -515,18 +541,30 @@ class DatabaseHelper {
 
     final expensesResult = await db.rawQuery(expensesSql);
 
+    final purchaseOverheadsResult = await db.rawQuery(
+      'SELECT SUM(transport_cost) as transport, SUM(other_cost) as other FROM purchases '
+      '$dateFilter',
+    );
+
     double revenue = (salesResult.first['revenue'] as num?)?.toDouble() ?? 0.0;
     double profit = (salesResult.first['profit'] as num?)?.toDouble() ?? 0.0;
     double balance = (salesResult.first['balance'] as num?)?.toDouble() ?? 0.0;
     double taxLiability = (salesResult.first['tax'] as num?)?.toDouble() ?? 0.0;
 
-    double deliveryCosts = 0.0;
+    double purchaseTransport = (purchaseOverheadsResult.first['transport'] as num?)?.toDouble() ?? 0.0;
+    double purchaseOther = (purchaseOverheadsResult.first['other'] as num?)?.toDouble() ?? 0.0;
+
+    double deliveryCosts = purchaseTransport;
     double employeeCosts = 0.0;
-    double otherExpenses = 0.0;
+    double otherExpenses = purchaseOther;
+
+    double opexToSubtract = 0.0; // Expenses from the 'expenses' table
 
     for (var row in expensesResult) {
       final type = row['expense_type'] as String;
       final amt = (row['total'] as num?)?.toDouble() ?? 0.0;
+      opexToSubtract += amt;
+      
       if (type == 'Delivery') {
         deliveryCosts += amt;
       } else if (type == 'Employee') {
@@ -566,8 +604,8 @@ class DatabaseHelper {
           profit +
           deliveryCosts +
           employeeCosts +
-          otherExpenses, // Profit before overheads
-      'net_profit': profit - otherExpenses - depreciationExpense, // Final profit after all costs including depr.
+          otherExpenses, // Display metric
+      'net_profit': profit - opexToSubtract - depreciationExpense, // Correctly avoid double-deducting purchase overheads
       'delivery_costs': deliveryCosts,
       'employee_costs': employeeCosts,
       'other_expenses': otherExpenses,
@@ -682,6 +720,23 @@ class DatabaseHelper {
   Future<int> deleteExpense(int id) async {
     final db = await instance.database;
     return await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // Receipt Settings
+  Future<Map<String, dynamic>> getReceiptSettings() async {
+    final db = await instance.database;
+    final result = await db.query('receipt_settings', where: 'id = 1');
+    if (result.isNotEmpty) return result.first;
+    return {};
+  }
+
+  Future<int> updateReceiptSettings(Map<String, dynamic> settings) async {
+    final db = await instance.database;
+    return await db.insert(
+      'receipt_settings',
+      {'id': 1, ...settings},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future close() async {

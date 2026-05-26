@@ -6,7 +6,6 @@ import '../providers/providers.dart';
 import '../database/database_helper.dart';
 import '../services/location_service.dart';
 import 'package:intl/intl.dart';
-import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../features/receipts/services/receipt_mapper.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
 import '../theme/insta_theme.dart';
@@ -21,7 +20,7 @@ class PurchaseScreen extends ConsumerStatefulWidget {
 
 class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   void _showAddPurchaseDialog() {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const _PurchaseFormPage()));
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseFormPage()));
   }
 
   @override
@@ -131,18 +130,14 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   }
 }
 
-class _PurchaseFormPage extends ConsumerStatefulWidget {
-  const _PurchaseFormPage();
+class PurchaseFormPage extends ConsumerStatefulWidget {
+  const PurchaseFormPage({super.key});
 
   @override
-  ConsumerState<_PurchaseFormPage> createState() => _PurchaseFormPageState();
+  ConsumerState<PurchaseFormPage> createState() => _PurchaseFormPageState();
 }
 
-class _PurchaseFormPageState extends ConsumerState<_PurchaseFormPage> {
-  final GlobalKey _dateFieldKey = GlobalKey();
-  final GlobalKey _supplierFieldKey = GlobalKey();
-  final GlobalKey _cratesFieldKey = GlobalKey();
-
+class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
   final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
   final _transportController = TextEditingController(text: '0');
@@ -230,7 +225,6 @@ class _PurchaseFormPageState extends ConsumerState<_PurchaseFormPage> {
       child: Column(
         children: [
           ListTile(
-            key: _dateFieldKey,
             title: Text(
               'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
               style: const TextStyle(color: InstaPalette.textPrimary),
@@ -248,43 +242,40 @@ class _PurchaseFormPageState extends ConsumerState<_PurchaseFormPage> {
               }
             },
           ),
-          Container(
-            key: _supplierFieldKey,
-            child: suppliersAsync.when(
-              data: (list) {
-                return Column(
-                  children: [
-                    DropdownButtonFormField<dynamic>(
-                      value: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
-                      decoration: const InputDecoration(labelText: 'Supplier', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      items: [
-                        ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
-                        const DropdownMenuItem(
-                          value: 'ADD_NEW',
-                          child: Row(children: [Icon(Icons.add, color: InstaPalette.accent), SizedBox(width: 8), Text('Add New Supplier', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val == 'ADD_NEW') {
-                          setState(() { _isQuickAddingSupplier = true; _selectedSupplier = null; });
-                        } else {
-                          setState(() { _isQuickAddingSupplier = false; _selectedSupplier = val as Supplier; });
-                        }
-                      },
-                    ),
-                    if (_isQuickAddingSupplier) ...[
-                      TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
-                      TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
-                      const Divider(),
+          suppliersAsync.when(
+            data: (list) {
+              return Column(
+                children: [
+                  DropdownButtonFormField<dynamic>(
+                    value: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
+                    decoration: const InputDecoration(labelText: 'Supplier', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
+                    items: [
+                      ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
+                      const DropdownMenuItem(
+                        value: 'ADD_NEW',
+                        child: Row(children: [Icon(Icons.add, color: InstaPalette.accent), SizedBox(width: 8), Text('Add New Supplier', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
+                      ),
                     ],
+                    onChanged: (val) {
+                      if (val == 'ADD_NEW') {
+                        setState(() { _isQuickAddingSupplier = true; _selectedSupplier = null; });
+                      } else {
+                        setState(() { _isQuickAddingSupplier = false; _selectedSupplier = val as Supplier; });
+                      }
+                    },
+                  ),
+                  if (_isQuickAddingSupplier) ...[
+                    TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+                    TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
+                    const Divider(),
                   ],
-                );
-              },
-              loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
-              error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
-            ),
+                ],
+              );
+            },
+            loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
+            error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
           ),
-          TextField(key: _cratesFieldKey, controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+          TextField(controller: _cratesController, decoration: const InputDecoration(labelText: 'Crates', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _priceController, decoration: const InputDecoration(labelText: 'Price per Crate', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _transportController, decoration: const InputDecoration(labelText: 'Transport Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
           TextField(controller: _otherController, decoration: const InputDecoration(labelText: 'Other Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
@@ -292,39 +283,5 @@ class _PurchaseFormPageState extends ConsumerState<_PurchaseFormPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showPurchaseTutorial());
-  }
-
-  void _showPurchaseTutorial() {
-    final targets = <TargetFocus>[
-      TargetFocus(
-        identify: "date",
-        keyTarget: _dateFieldKey,
-        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Select the date of the purchase.", style: TextStyle(color: Colors.white, fontSize: 16)))],
-      ),
-      TargetFocus(
-        identify: "supplier",
-        keyTarget: _supplierFieldKey,
-        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Select or add a new supplier.", style: TextStyle(color: Colors.white, fontSize: 16)))],
-      ),
-      TargetFocus(
-        identify: "crates",
-        keyTarget: _cratesFieldKey,
-        contents: [TargetContent(align: ContentAlign.bottom, child: const Text("Enter the number of crates purchased.", style: TextStyle(color: Colors.white, fontSize: 16)))],
-      ),
-    ];
-
-    TutorialCoachMark(
-      targets: targets,
-      colorShadow: Colors.black,
-      textSkip: "SKIP",
-      paddingFocus: 10,
-      opacityShadow: 0.6,
-    ).show(context: context);
   }
 }

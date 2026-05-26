@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../theme/insta_theme.dart';
 import '../providers/providers.dart';
 import '../widgets/quick_add_dialogs.dart';
@@ -17,12 +16,8 @@ import 'package:intl/intl.dart';
 class DashboardScreen extends ConsumerWidget {
   DashboardScreen({super.key});
 
-  final GlobalKey _inventoryKey = GlobalKey();
-  final GlobalKey _quickActionsKey = GlobalKey();
-  final GlobalKey _saleButtonKey = GlobalKey();
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final summaryAsync = ref.watch(dashboardSummaryProvider);
     final inventoryAsync = ref.watch(inventoryBalanceProvider);
     final dateRange = ref.watch(dashboardDateRangeProvider);
@@ -91,7 +86,6 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               // Inventory Row
               Row(
-                key: _inventoryKey,
                 children: [
                   Expanded(child: _buildSummaryCard(
                     'Stock Count', 
@@ -108,7 +102,6 @@ class DashboardScreen extends ConsumerWidget {
                   )),
                 ],
               ),
-// ... (omitting lines for brevity in instruction, but full replacement is required)
               const SizedBox(height: 16),
               // Revenue & Profit Row
               Row(
@@ -161,32 +154,26 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 32),
-              Container(
-                key: _quickActionsKey,
-                child: Column(
-                  children: [
-                    Text('QUICK ACTIONS', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary), textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    _buildLargeButton(context, 'NEW PURCHASE', Icons.shopping_cart, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseScreen()))),
-                    const SizedBox(height: 12),
-                    Container(
-                      key: _saleButtonKey,
-                      child: _buildLargeButton(context, 'NEW SALE', Icons.sell, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SaleScreen()))),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLargeButton(context, 'RECORD EXPENSE', Icons.money_off, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()))),
-                    const SizedBox(height: 12),
-                    _buildLargeButton(context, 'RECORD EQUITY', Icons.account_balance_wallet, () => QuickAddDialogs.showEquityDialog(context, ref)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _buildLargeButton(context, 'SUPPLIER', Icons.person_add, () => QuickAddDialogs.showAddSupplierDialog(context, ref))),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildLargeButton(context, 'CUSTOMER', Icons.person_add_alt_1, () => QuickAddDialogs.showAddCustomerDialog(context, ref))),
-                      ],
-                    ),
-                  ],
-                ),
+              Column(
+                children: [
+                  Text('QUICK ACTIONS', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  _buildLargeButton(context, 'NEW PURCHASE', Icons.shopping_cart, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseFormPage()))),
+                  const SizedBox(height: 12),
+                  _buildLargeButton(context, 'NEW SALE', Icons.sell, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SaleFormPage()))),
+                  const SizedBox(height: 12),
+                  _buildLargeButton(context, 'RECORD EXPENSE', Icons.money_off, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseScreen()))),
+                  const SizedBox(height: 12),
+                  _buildLargeButton(context, 'RECORD EQUITY', Icons.account_balance_wallet, () => QuickAddDialogs.showEquityDialog(context, ref)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildLargeButton(context, 'SUPPLIER', Icons.person_add, () => QuickAddDialogs.showAddSupplierDialog(context, ref))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildLargeButton(context, 'CUSTOMER', Icons.person_add_alt_1, () => QuickAddDialogs.showAddCustomerDialog(context, ref))),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               Text('REPORTS', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: InstaPalette.textPrimary), textAlign: TextAlign.center),

@@ -20,7 +20,7 @@ class SaleScreen extends ConsumerStatefulWidget {
 
 class _SaleScreenState extends ConsumerState<SaleScreen> {
   void _showAddSaleDialog() {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const _SaleFormPage()));
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const SaleFormPage()));
   }
 
   void _showSettleDebtDialog(Sale sale) {
@@ -185,14 +185,14 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
   }
 }
 
-class _SaleFormPage extends ConsumerStatefulWidget {
-  const _SaleFormPage();
+class SaleFormPage extends ConsumerStatefulWidget {
+  const SaleFormPage({super.key});
 
   @override
-  ConsumerState<_SaleFormPage> createState() => _SaleFormPageState();
+  ConsumerState<SaleFormPage> createState() => _SaleFormPageState();
 }
 
-class _SaleFormPageState extends ConsumerState<_SaleFormPage> {
+class _SaleFormPageState extends ConsumerState<SaleFormPage> {
   final _cratesController = TextEditingController();
   final _priceController = TextEditingController();
   final _taxRateController = TextEditingController(text: '0');
