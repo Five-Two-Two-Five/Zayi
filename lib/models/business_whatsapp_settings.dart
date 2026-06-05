@@ -5,6 +5,7 @@ class BusinessWhatsappSettings {
   final String accessToken;
   final String verifyToken;
   final DateTime createdAt;
+  final bool useUnofficialWebhook;
 
   BusinessWhatsappSettings({
     this.id,
@@ -13,6 +14,7 @@ class BusinessWhatsappSettings {
     required this.accessToken,
     required this.verifyToken,
     required this.createdAt,
+    this.useUnofficialWebhook = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +25,7 @@ class BusinessWhatsappSettings {
       'access_token': accessToken,
       'verify_token': verifyToken,
       'created_at': createdAt.toIso8601String(),
+      'use_unofficial_webhook': useUnofficialWebhook ? 1 : 0,
     };
   }
 
@@ -34,6 +37,7 @@ class BusinessWhatsappSettings {
       accessToken: map['access_token'],
       verifyToken: map['verify_token'],
       createdAt: DateTime.parse(map['created_at']),
+      useUnofficialWebhook: (map['use_unofficial_webhook'] ?? 0) == 1,
     );
   }
 }
