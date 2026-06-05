@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: zayi-whatsapp-bot
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    rootDir: whatsapp-bot
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
+      # NOTE: Add SUPABASE_URL and SUPABASE_KEY in Render Dashboard
