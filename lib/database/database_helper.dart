@@ -9,36 +9,12 @@ import '../models/expense.dart';
 import '../models/inventory.dart';
 import '../models/fixed_asset.dart';
 import '../models/product.dart';
-import '../models/business_whatsapp_settings.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
-
-  Future<int> saveWhatsappSettings(BusinessWhatsappSettings settings) async {
-    final db = await instance.database;
-    final existing = await db.query(
-      'whatsapp_settings',
-      where: 'phone_number_id = ?',
-      whereArgs: [settings.phoneNumberId],
-    );
-
-    if (existing.isNotEmpty) {
-      return await db.update(
-        'whatsapp_settings',
-        settings.toMap()..remove('id'),
-        where: 'phone_number_id = ?',
-        whereArgs: [settings.phoneNumberId],
-      );
-    } else {
-      return await db.insert(
-        'whatsapp_settings',
-        settings.toMap()..remove('id'),
-      );
-    }
-  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -411,18 +387,6 @@ class DatabaseHelper {
         predefined_taxes TEXT,
         payment_method_charges TEXT,
         remembered_printer_address TEXT
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS whatsapp_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_name TEXT NOT NULL,
-        phone_number_id TEXT NOT NULL,
-        access_token TEXT NOT NULL,
-        verify_token TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        use_unofficial_webhook INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

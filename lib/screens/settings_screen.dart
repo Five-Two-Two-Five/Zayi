@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'receipt_settings_screen.dart';
 import 'payment_charges_screen.dart';
 import 'printer_settings_screen.dart';
-import 'whatsapp_settings_screen.dart'; // Import WhatsAppSettingsScreen
 import '../theme/insta_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -20,15 +19,6 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // ... existing ListTiles ...
-          ListTile(
-            leading: const Icon(Icons.chat, color: InstaPalette.accent),
-            title: const Text('WhatsApp Bot Setup'),
-            subtitle: const Text('Configure your WhatsApp Business API credentials'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WhatsAppSettingsScreen())),
-          ),
-          const Divider(),
           ListTile(
             leading: const Icon(Icons.receipt_long, color: InstaPalette.accent),
             title: const Text('Receipt Settings'),

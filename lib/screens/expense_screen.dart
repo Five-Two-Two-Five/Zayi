@@ -227,6 +227,15 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ref.read(profitTrendProvider.notifier).refresh();
           ref.read(expenseDistributionProvider.notifier).refresh();
 
+          // Sync to Supabase for WhatsApp Bot
+          CloudSyncService.syncRecentTransaction(
+            phone: settings.phone,
+            type: 'expense',
+            amount: amt,
+            description: expense.description.isEmpty ? expense.expenseType : expense.description,
+          );
+          CloudSyncService.triggerAllSyncs(context, ref);
+
           if (!context.mounted) return;
           Navigator.pop(context);
         } catch (e) {

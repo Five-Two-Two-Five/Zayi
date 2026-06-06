@@ -311,6 +311,15 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
           ref.invalidate(dashboardSummaryProvider);
           ref.read(profitTrendProvider.notifier).refresh();
 
+          // Sync to Supabase for WhatsApp Bot
+          CloudSyncService.syncRecentTransaction(
+            phone: settings.phone,
+            type: 'sale',
+            amount: totalRevenue,
+            description: '${sale.cratesSold} ${activeProduct?.unitName ?? 'Units'} sold',
+          );
+          CloudSyncService.triggerAllSyncs(context, ref);
+
           if (!context.mounted) return;
           Navigator.pop(context);
         } catch (e) {
