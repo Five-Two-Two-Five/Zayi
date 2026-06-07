@@ -67,14 +67,13 @@ class _ReceiptSettingsFormState extends ConsumerState<ReceiptSettingsForm> {
     if (image == null) return;
 
     if (!mounted) return;
-    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Processing image...')),
     );
     
     final processedPath = await LogoService.processAndSaveLogo(image.path);
     
-    if (!context.mounted) return; 
+    if (!mounted) return; 
     
     if (processedPath != null) {
       setState(() {
@@ -245,7 +244,7 @@ class _ReceiptSettingsFormState extends ConsumerState<ReceiptSettingsForm> {
       children: [
         const Text('Base Currency', style: TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
         DropdownButtonFormField<String>(
-          value: _baseCurrency,
+          initialValue: _baseCurrency,
           items: ['USD', 'ZiG'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
           onChanged: (v) => setState(() => _baseCurrency = v!),
           decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),

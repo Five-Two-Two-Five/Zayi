@@ -5,7 +5,6 @@ import 'customers_screen.dart';
 import 'assets_screen.dart';
 import 'printer_settings_screen.dart';
 import 'products_screen.dart';
-import 'incoming_orders_screen.dart'; // Import IncomingOrdersScreen
 
 class ManagementScreen extends StatelessWidget {
   const ManagementScreen({super.key});
@@ -27,7 +26,6 @@ class ManagementScreen extends StatelessWidget {
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
           children: [
-            _buildManagementCard(context, 'WhatsApp Orders', Icons.chat, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IncomingOrdersScreen()))),
             _buildManagementCard(context, 'Products', Icons.inventory_2, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen()))),
             _buildManagementCard(context, 'Suppliers', Icons.local_shipping, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SuppliersScreen()))),
             _buildManagementCard(context, 'Customers', Icons.people, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersScreen()))),

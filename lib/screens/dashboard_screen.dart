@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../theme/insta_theme.dart';
 import '../providers/providers.dart';
 import '../widgets/quick_add_dialogs.dart';
-import '../widgets/dashboard_charts.dart';
-import '../models/fixed_asset.dart';
 import 'purchase_screen.dart';
 import 'sale_screen.dart';
 import 'expense_screen.dart';
 import 'inventory_breakdown_screen.dart';
-import '../database/database_helper.dart';
-import '../widgets/generic_breakdown_screen.dart';
 import 'package:intl/intl.dart';
-import 'product_selection_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -92,7 +86,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       data: (currencies) {
                         final String? selectedCurrency = currencyFilter ?? (currencies.isNotEmpty ? currencies.first : null);
                         return DropdownButtonFormField<String>(
-                          value: selectedCurrency,
+                          initialValue: selectedCurrency,
                           decoration: const InputDecoration(labelText: 'Currency', contentPadding: EdgeInsets.symmetric(horizontal: InstaPalette.spacingS, vertical: InstaPalette.spacingS)),
                           items: currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                           onChanged: (v) => ref.read(dashboardCurrencyFilterProvider.notifier).state = v,
@@ -106,7 +100,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Expanded(
                     child: ref.watch(paymentMethodsProvider).when(
                       data: (methods) => DropdownButtonFormField<String>(
-                        value: paymentMethodFilter,
+                        initialValue: paymentMethodFilter,
                         decoration: const InputDecoration(labelText: 'Payment Method', contentPadding: EdgeInsets.symmetric(horizontal: InstaPalette.spacingS, vertical: InstaPalette.spacingS)),
                         items: [null, ...methods].map((m) => DropdownMenuItem(value: m, child: Text(m ?? 'All'))).toList(),
                         onChanged: (v) => ref.read(dashboardPaymentMethodFilterProvider.notifier).state = v,

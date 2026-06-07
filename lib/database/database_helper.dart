@@ -563,7 +563,6 @@ class DatabaseHelper {
     return result.map((json) => Sale.fromMap(json)).toList();
   }
 
-  // Sales
   Future<int> createSale(Sale sale) async {
     final db = await instance.database;
     final product = await getProductById(sale.productId);
@@ -1355,8 +1354,9 @@ class DatabaseHelper {
     );
     final set = <String>{};
     for (var row in result) {
-      if (row['payment_method'] != null)
+      if (row['payment_method'] != null) {
         set.add(row['payment_method'] as String);
+      }
     }
 
     // Add default ones

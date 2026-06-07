@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -21,12 +20,6 @@ Future<void> main() async {
 
   // Init local database
   await DatabaseHelper.instance.database;
-
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: 'https://hvvkrrhjkruaupdenbty.supabase.co',
-    anonKey: 'sb_publishable_Q1w3PyEax5oeIkpRmoyVOA_vhDjShsv',
-  );
 
   runApp(const ProviderScope(child: EggTraderApp()));
 }
