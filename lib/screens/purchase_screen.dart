@@ -298,9 +298,11 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                       },
                     ),
                     if (_isQuickAddingSupplier) ...[
+                      const SizedBox(height: 16),
                       TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+                      const SizedBox(height: 16),
                       TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
-                      const Divider(),
+                      const Divider(height: 32),
                     ],
                   ],
                 );
@@ -308,6 +310,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
               loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
               error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
             ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(child: _buildCurrencySelector(settings.baseCurrency)),
@@ -324,8 +327,11 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                   ),
               ],
             ),
+            const SizedBox(height: 16),
             TextField(controller: _cratesController, decoration: InputDecoration(labelText: '${activeProduct?.unitName ?? 'Units'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+            const SizedBox(height: 16),
             TextField(controller: _priceController, decoration: InputDecoration(labelText: 'Price per ${activeProduct?.unitName ?? 'Unit'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -345,7 +351,9 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
             TextField(controller: _transportController, decoration: const InputDecoration(labelText: 'Transport Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(child: TextField(controller: _otherController, decoration: const InputDecoration(labelText: 'Other Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number)),
@@ -353,6 +361,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
                 Expanded(child: TextField(controller: _otherDescriptionController, decoration: const InputDecoration(labelText: 'Cost Description', labelStyle: TextStyle(color: InstaPalette.textSecondary)))),
               ],
             ),
+            const SizedBox(height: 16),
             TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
           ],
         ),

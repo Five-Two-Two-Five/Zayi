@@ -202,7 +202,7 @@ class _ReceiptSettingsFormState extends ConsumerState<ReceiptSettingsForm> {
 
   Widget _buildTextFormField(TextEditingController controller, String label, IconData icon, {int maxLines = 1, TextInputType? keyboardType, bool isRequired = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
         controller: controller,
         maxLines: maxLines,
@@ -224,15 +224,19 @@ class _ReceiptSettingsFormState extends ConsumerState<ReceiptSettingsForm> {
         ..._predefinedTaxes.asMap().entries.map((entry) {
           final idx = entry.key;
           final tax = entry.value;
-          return Row(
-            children: [
-              Expanded(child: TextFormField(decoration: const InputDecoration(labelText: 'Label', isDense: true), initialValue: tax['label'], onChanged: (v) => _predefinedTaxes[idx]['label'] = v)),
-              const SizedBox(width: 8),
-              Expanded(child: TextFormField(decoration: const InputDecoration(labelText: 'Rate %', isDense: true), initialValue: tax['rate'].toString(), onChanged: (v) => _predefinedTaxes[idx]['rate'] = double.tryParse(v) ?? 0.0)),
-              IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => setState(() => _predefinedTaxes.removeAt(idx))),
-            ],
+          return Padding(
+            padding: const EdgeInsets.only(top: 12.0),
+            child: Row(
+              children: [
+                Expanded(child: TextFormField(decoration: const InputDecoration(labelText: 'Label', isDense: true), initialValue: tax['label'], onChanged: (v) => _predefinedTaxes[idx]['label'] = v)),
+                const SizedBox(width: 8),
+                Expanded(child: TextFormField(decoration: const InputDecoration(labelText: 'Rate %', isDense: true), initialValue: tax['rate'].toString(), onChanged: (v) => _predefinedTaxes[idx]['rate'] = double.tryParse(v) ?? 0.0)),
+                IconButton(icon: const Icon(Icons.remove_circle_outline, color: Colors.red), onPressed: () => setState(() => _predefinedTaxes.removeAt(idx))),
+              ],
+            ),
           );
         }),
+        const SizedBox(height: 8),
         TextButton.icon(onPressed: () => setState(() => _predefinedTaxes.add({'label': '', 'rate': 0.0})), icon: const Icon(Icons.add), label: const Text('Add Tax')),
       ],
     );
