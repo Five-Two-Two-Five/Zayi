@@ -364,9 +364,9 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
                       },
                     ),
                     if (_isQuickAddingCustomer) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 5),
                       TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Customer Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 5),
                       TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Customer Phone (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
                       const Divider(height: 32),
                     ],
@@ -376,7 +376,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
               loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
               error: (e, s) => const Text('Error loading customers', style: TextStyle(color: Colors.red)),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             Row(
               children: [
                 Expanded(child: _buildCurrencySelector(settings.baseCurrency)),
@@ -393,7 +393,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             Row(
               children: [
                 Expanded(
@@ -417,7 +417,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
                 ],
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             TextField(
               controller: _priceController, 
               decoration: InputDecoration(labelText: 'Price per ${activeProduct?.unitName ?? 'Unit'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), 
@@ -425,7 +425,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
               onChanged: (v) => setState(() {}),
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             // Expected Amount Read-only field
             Builder(
               builder: (context) {
@@ -471,14 +471,14 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
                 activeThumbColor: InstaPalette.accent,
               ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             TextField(
               controller: _paidController, 
               decoration: const InputDecoration(labelText: 'Amount Paid *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), 
               keyboardType: TextInputType.number,
               onChanged: (v) => setState(() {}),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             DropdownButtonFormField<String>(
               initialValue: _paymentMethod,
               items: ['Cash', 'Card', 'Ecocash', 'Other'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
@@ -488,13 +488,13 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
             if (_paymentMethod != 'Cash' && paid > 0)
               _buildChargePreview(settings, paid),
             if (_paymentMethod == 'Other') ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 5),
               TextField(
                 controller: _otherMethodController,
                 decoration: const InputDecoration(labelText: 'Specify Method *'),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
           ],
         ),

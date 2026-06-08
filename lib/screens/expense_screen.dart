@@ -263,14 +263,14 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               items: _expenseTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: InstaPalette.textPrimary)))).toList(),
               onChanged: (val) => setState(() => _selectedType = val!),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             if (_selectedType == 'Employee') ...[
               TextField(controller: _employeeNameController, decoration: const InputDecoration(labelText: 'Employee Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
-              const SizedBox(height: 16),
+              const SizedBox(height: 5),
             ],
             if (_selectedType == 'Delivery') ...[
               TextField(controller: _extraDetailsController, decoration: const InputDecoration(labelText: 'Vehicle / Route Details *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
-              const SizedBox(height: 16),
+              const SizedBox(height: 5),
             ],
             Row(
               children: [
@@ -288,9 +288,9 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             TextField(controller: _amountController, decoration: const InputDecoration(labelText: 'Amount *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number, enabled: !_isSaving),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Description (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
           ],
         ),

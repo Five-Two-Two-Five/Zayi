@@ -39,17 +39,23 @@ class EggTraderApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: InstaPalette.cardBackground,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          isDense: false,
+          alignLabelWithHint: true,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide.none,
+            borderSide: const BorderSide(color: InstaPalette.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: InstaPalette.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: InstaPalette.accent, width: 2),
           ),
           floatingLabelBehavior: FloatingLabelBehavior.always,
-          labelStyle: const TextStyle(color: InstaPalette.textSecondary),
+          labelStyle: const TextStyle(color: InstaPalette.textSecondary, fontSize: 14),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(

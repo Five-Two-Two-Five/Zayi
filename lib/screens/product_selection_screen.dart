@@ -90,7 +90,7 @@ class ProductSelectionScreen extends ConsumerWidget {
                 color: InstaPalette.accent,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 5),
             Text(
               product.name.toUpperCase(),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -149,14 +149,17 @@ class ProductSelectionScreen extends ConsumerWidget {
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Product Name (e.g. Chickens)'),
               ),
+              const SizedBox(height: 5),
               TextField(
                 controller: unitController,
                 decoration: const InputDecoration(labelText: 'Primary Unit (e.g. Full Chicken)'),
               ),
+              const SizedBox(height: 5),
               TextField(
                 controller: subUnitController,
                 decoration: const InputDecoration(labelText: 'Sub-unit (Optional, e.g. Piece)'),
               ),
+              const SizedBox(height: 5),
               TextField(
                 controller: ratioController,
                 decoration: const InputDecoration(labelText: 'Sub-units per Unit'),
