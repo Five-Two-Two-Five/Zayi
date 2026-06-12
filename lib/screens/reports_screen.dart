@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import '../services/export_service.dart';
+import '../services/import_service.dart';
 import '../theme/insta_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/providers.dart';
 
-
-class ReportsScreen extends StatelessWidget {
+class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: InstaPalette.background,
       appBar: AppBar(
-        title: const Text('Reports & Export', style: TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold)),
+        title: const Text('Reports & Data', style: TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold)),
         backgroundColor: InstaPalette.background,
         foregroundColor: InstaPalette.textPrimary,
         elevation: 0.5,
@@ -24,10 +26,9 @@ class ReportsScreen extends StatelessWidget {
             _buildSectionHeader('FINANCIAL INTELLIGENCE'),
             const SizedBox(height: 12),
             _buildMasterCard(context),
-            const SizedBox(height: 12),
-
+            
             const SizedBox(height: 32),
-            _buildSectionHeader('EXPORT DATA'),
+            _buildSectionHeader('EXPORT DATA (CSV)'),
             const SizedBox(height: 12),
             GridView.count(
               shrinkWrap: true,
@@ -42,10 +43,30 @@ class ReportsScreen extends StatelessWidget {
                 _buildExportCard(context, 'Expenses', 'expenses', Icons.money_off),
                 _buildExportCard(context, 'Suppliers', 'suppliers', Icons.local_shipping),
                 _buildExportCard(context, 'Customers', 'customers', Icons.people),
-                _buildExportCard(context, 'Inventory', 'inventory', Icons.inventory),
-                _buildExportCard(context, 'Tax Report', 'sales', Icons.receipt_long),
+                _buildExportCard(context, 'Products', 'products', Icons.category),
               ],
             ),
+
+            const SizedBox(height: 32),
+            _buildSectionHeader('IMPORT DATA (CSV)'),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.5,
+              children: [
+                _buildImportCard(context, ref, 'Purchases', 'purchases', Icons.file_upload),
+                _buildImportCard(context, ref, 'Sales', 'sales', Icons.file_upload),
+                _buildImportCard(context, ref, 'Expenses', 'expenses', Icons.file_upload),
+                _buildImportCard(context, ref, 'Suppliers', 'suppliers', Icons.file_upload),
+                _buildImportCard(context, ref, 'Customers', 'customers', Icons.file_upload),
+                _buildImportCard(context, ref, 'Products', 'products', Icons.file_upload),
+              ],
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -104,5 +125,66 @@ class ReportsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildImportCard(BuildContext context, WidgetRef ref, String title, String table, IconData icon) {
+    return InkWell(
+      onTap: () async {
+        try {
+          final count = await ImportService.importFromCsv(table);
+          if (count > 0) {
+            // Refresh relevant providers
+            _refreshProviders(ref, table);
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Successfully imported $count $title')));
+          }
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error importing $table: $e')));
+        }
+      },
+      child: Card(
+        elevation: 0,
+        color: InstaPalette.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: InstaPalette.border)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: InstaPalette.accent, size: 28),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: InstaPalette.textPrimary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _refreshProviders(WidgetRef ref, String table) {
+    switch (table) {
+      case 'sales':
+        ref.invalidate(salesProvider);
+        ref.invalidate(dashboardSummaryProvider);
+        break;
+      case 'purchases':
+        ref.invalidate(purchasesProvider);
+        ref.invalidate(inventoryBalanceProvider);
+        break;
+      case 'expenses':
+        ref.invalidate(expensesProvider);
+        ref.invalidate(dashboardSummaryProvider);
+        break;
+      case 'customers':
+        ref.read(customersProvider.notifier).refresh();
+        break;
+      case 'suppliers':
+        ref.invalidate(suppliersProvider);
+        break;
+      case 'products':
+        ref.invalidate(productsProvider);
+        break;
+    }
+    // Also invalidate common metrics
+    ref.invalidate(inventoryBalanceProvider);
+    ref.invalidate(dashboardSummaryProvider);
   }
 }

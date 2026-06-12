@@ -10,6 +10,7 @@ import '../features/receipts/services/receipt_mapper.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
 import '../theme/insta_theme.dart';
 import '../widgets/full_page_add_dialog.dart';
+import '../widgets/form_utils.dart';
 
 class PurchaseScreen extends ConsumerStatefulWidget {
   const PurchaseScreen({super.key});
@@ -151,6 +152,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
   bool _isQuickAddingSupplier = false;
   String _currencyCode = 'USD';
   double _exchangeRate = 1.0;
+  bool _showAdvanced = false;
 
   @override
   void initState() {
@@ -180,19 +182,25 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
     final settingsAsync = ref.watch(receiptSettingsProvider);
     final activeProduct = ref.watch(activeProductProvider);
 
+    final crates = double.tryParse(_cratesController.text) ?? 0;
+    final price = double.tryParse(_priceController.text) ?? 0;
+    final transport = double.tryParse(_transportController.text) ?? 0;
+    final other = double.tryParse(_otherController.text) ?? 0;
+    final total = (crates * price) + transport + other;
+
     return FullPageAddDialog(
       title: 'New ${activeProduct?.name ?? 'Purchase'}',
       isSaving: _isSaving,
       onSave: () async {
         final cratesCount = int.tryParse(_cratesController.text);
-        final price = double.tryParse(_priceController.text);
-        final transport = double.tryParse(_transportController.text) ?? 0.0;
-        final other = double.tryParse(_otherController.text) ?? 0.0;
+        final priceValue = double.tryParse(_priceController.text);
+        final transportValue = double.tryParse(_transportController.text) ?? 0.0;
+        final otherValue = double.tryParse(_otherController.text) ?? 0.0;
 
         if ((!_isQuickAddingSupplier && _selectedSupplier == null) ||
             (_isQuickAddingSupplier && _newNameController.text.isEmpty) ||
             cratesCount == null ||
-            price == null) {
+            priceValue == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Please fill all required fields correctly')),
           );
@@ -216,7 +224,7 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
             await ref.read(suppliersProvider.notifier).refresh();
           }
 
-          final total = (cratesCount * price) + transport + other;
+          final totalCost = (cratesCount * priceValue) + transportValue + otherValue;
           final pos = await LocationService.getCurrentLocation();
           
           final effectiveRate = _currencyCode == settings.baseCurrency ? 1.0 : _exchangeRate;
@@ -226,11 +234,11 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
             supplierId: supplierToUse!.id!,
             crates: cratesCount,
             remainingEggs: cratesCount * (activeProduct?.subUnitsPerUnit ?? 30),
-            buyingPricePerCrate: price,
-            transportCost: transport,
-            otherCost: other,
+            buyingPricePerCrate: priceValue,
+            transportCost: transportValue,
+            otherCost: otherValue,
             otherCostDescription: _otherDescriptionController.text.isNotEmpty ? _otherDescriptionController.text : null,
-            totalCost: total,
+            totalCost: totalCost,
             batchNumber: _batchController.text.isNotEmpty ? _batchController.text : null,
             notes: _notesController.text,
             createdAt: _selectedDate,
@@ -257,143 +265,221 @@ class _PurchaseFormPageState extends ConsumerState<PurchaseFormPage> {
       child: settingsAsync.when(
         data: (settings) => Column(
           children: [
-            ListTile(
-              title: Text(
-                'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                style: const TextStyle(color: InstaPalette.textPrimary),
-              ),
-              trailing: const Icon(Icons.calendar_today, color: InstaPalette.textPrimary),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now().add(const Duration(days: 3650)),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDate = picked);
-                }
-              },
-            ),
-            suppliersAsync.when(
-              data: (list) {
-                return Column(
-                  children: [
-                    DropdownButtonFormField<dynamic>(
-                      initialValue: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
-                      decoration: const InputDecoration(labelText: 'Supplier *', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      items: [
-                        ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
-                        const DropdownMenuItem(
-                          value: 'ADD_NEW',
-                          child: Row(children: [Icon(Icons.add, color: InstaPalette.accent), SizedBox(width: 8), Text('Add New Supplier', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
+            FormSection(
+              title: 'Supplier & Date',
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+                    style: const TextStyle(color: InstaPalette.textPrimary, fontSize: 14),
+                  ),
+                  trailing: const Icon(Icons.calendar_today, color: InstaPalette.accent, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now().add(const Duration(days: 3650)),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                ),
+                suppliersAsync.when(
+                  data: (list) {
+                    return Column(
+                      children: [
+                        DropdownButtonFormField<dynamic>(
+                          initialValue: _isQuickAddingSupplier ? 'ADD_NEW' : _selectedSupplier,
+                          decoration: const InputDecoration(labelText: 'Select Supplier *'),
+                          items: [
+                            ...list.map((s) => DropdownMenuItem(value: s, child: Text(s.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
+                            const DropdownMenuItem(
+                              value: 'ADD_NEW',
+                              child: Row(children: [Icon(Icons.add, color: InstaPalette.accent, size: 18), SizedBox(width: 8), Text('Add New Supplier', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val == 'ADD_NEW') {
+                              setState(() { _isQuickAddingSupplier = true; _selectedSupplier = null; });
+                            } else {
+                              setState(() { _isQuickAddingSupplier = false; _selectedSupplier = val as Supplier; });
+                            }
+                          },
                         ),
+                        if (_isQuickAddingSupplier) ...[
+                          const SizedBox(height: 12),
+                          TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name *')),
+                          const SizedBox(height: 12),
+                          TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone'), keyboardType: TextInputType.phone),
+                        ],
                       ],
-                      onChanged: (val) {
-                        if (val == 'ADD_NEW') {
-                          setState(() { _isQuickAddingSupplier = true; _selectedSupplier = null; });
-                        } else {
-                          setState(() { _isQuickAddingSupplier = false; _selectedSupplier = val as Supplier; });
-                        }
-                      },
+                    );
+                  },
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+            
+            FormSection(
+              title: 'Purchase Details',
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('CURRENCY:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: ['USD', 'ZiG'].map((c) {
+                            final isSelected = _currencyCode == c;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(c, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                                selected: isSelected,
+                                onSelected: (s) {
+                                  setState(() {
+                                    _currencyCode = c;
+                                    if (c == settings.baseCurrency) {
+                                      _exchangeRate = 1.0;
+                                      _exchangeRateController.text = '1.0';
+                                    }
+                                  });
+                                },
+                                selectedColor: InstaPalette.accent,
+                                backgroundColor: InstaPalette.background,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                                showCheckmark: false,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
-                    if (_isQuickAddingSupplier) ...[
-                      const SizedBox(height: 5),
-                      TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Supplier Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
-                      const SizedBox(height: 5),
-                      TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Supplier Phone', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
-                      const Divider(height: 32),
-                    ],
                   ],
-                );
-              },
-              loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
-              error: (e, s) => const Text('Error loading suppliers', style: TextStyle(color: Colors.red)),
-            ),
-            const SizedBox(height: 5),
-            Row(
-              children: [
-                Expanded(child: _buildCurrencySelector(settings.baseCurrency)),
-                if (_currencyCode != settings.baseCurrency)
-                  const SizedBox(width: 16),
-                if (_currencyCode != settings.baseCurrency)
-                  Expanded(
-                    child: TextField(
-                      controller: _exchangeRateController,
-                      decoration: const InputDecoration(labelText: 'Exchange Rate', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            TextField(controller: _cratesController, decoration: InputDecoration(labelText: '${activeProduct?.unitName ?? 'Units'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
-            const SizedBox(height: 5),
-            TextField(controller: _priceController, decoration: InputDecoration(labelText: 'Price per ${activeProduct?.unitName ?? 'Unit'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
-            const SizedBox(height: 5),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _batchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Batch Number',
-                      labelStyle: TextStyle(color: InstaPalette.textSecondary),
-                      hintText: 'e.g. B-20231027-01',
-                    ),
-                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.auto_fix_high, color: InstaPalette.accent),
-                  onPressed: _generateBatchNumber,
-                  tooltip: 'Auto-generate Batch ID',
+                if (_currencyCode != settings.baseCurrency)
+                  TextField(
+                    controller: _exchangeRateController,
+                    decoration: const InputDecoration(labelText: 'Exchange Rate *'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
+                  ),
+                const SizedBox(height: 4),
+                FormRow(
+                  children: [
+                    TextField(
+                      controller: _cratesController, 
+                      decoration: InputDecoration(labelText: '${activeProduct?.unitName ?? 'Units'} *'), 
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => setState(() {}),
+                    ),
+                    TextField(
+                      controller: _priceController, 
+                      decoration: InputDecoration(labelText: 'Price/${activeProduct?.unitName ?? 'Unit'} *'), 
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => setState(() {}),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 5),
-            TextField(controller: _transportController, decoration: const InputDecoration(labelText: 'Transport Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number),
-            const SizedBox(height: 5),
-            Row(
+
+            FormSection(
+              title: 'Additional Costs',
               children: [
-                Expanded(child: TextField(controller: _otherController, decoration: const InputDecoration(labelText: 'Other Cost', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number)),
-                const SizedBox(width: 12),
-                Expanded(child: TextField(controller: _otherDescriptionController, decoration: const InputDecoration(labelText: 'Cost Description', labelStyle: TextStyle(color: InstaPalette.textSecondary)))),
+                FormRow(
+                  children: [
+                    TextField(
+                      controller: _transportController, 
+                      decoration: const InputDecoration(labelText: 'Transport Cost'), 
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => setState(() {}),
+                    ),
+                    TextField(
+                      controller: _otherController, 
+                      decoration: const InputDecoration(labelText: 'Other Costs'), 
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) => setState(() {}),
+                    ),
+                  ],
+                ),
+                if (other > 0)
+                  TextField(
+                    controller: _otherDescriptionController,
+                    decoration: const InputDecoration(labelText: 'Cost Description'),
+                  ),
               ],
             ),
-            const SizedBox(height: 5),
-            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+
+            // Summary Banner
+            if (total > 0)
+              Container(
+                margin: const EdgeInsets.only(top: 24),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5D7B93).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF5D7B93).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Investment:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text('$_currencyCode ${total.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5D7B93))),
+                  ],
+                ),
+              ),
+
+            // Advanced Toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: TextButton.icon(
+                onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+                icon: Icon(_showAdvanced ? Icons.expand_less : Icons.expand_more, size: 18),
+                label: Text(_showAdvanced ? 'Hide Details' : 'Show More Details (Batch, Notes)'),
+                style: TextButton.styleFrom(foregroundColor: InstaPalette.textSecondary, textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ),
+
+            if (_showAdvanced)
+              FormSection(
+                title: 'Inventory & Notes',
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _batchController,
+                          decoration: const InputDecoration(labelText: 'Batch Number', hintText: 'e.g. B-20231027-01'),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.auto_fix_high, color: InstaPalette.accent, size: 20),
+                        onPressed: _generateBatchNumber,
+                        tooltip: 'Auto-generate Batch ID',
+                      ),
+                    ],
+                  ),
+                  TextField(
+                    controller: _notesController, 
+                    decoration: const InputDecoration(labelText: 'Notes (Optional)'),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            const SizedBox(height: 32),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Text('Error loading settings: $e'),
       ),
-    );
-  }
-
-  Widget _buildCurrencySelector(String baseCurrency) {
-    final currencies = ['USD', 'ZiG'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Currency', style: TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
-        DropdownButton<String>(
-          value: _currencyCode,
-          isExpanded: true,
-          items: currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-          onChanged: (v) {
-            if (v != null) {
-              setState(() {
-                _currencyCode = v;
-                if (v == baseCurrency) {
-                  _exchangeRate = 1.0;
-                  _exchangeRateController.text = '1.0';
-                }
-              });
-            }
-          },
-        ),
-      ],
     );
   }
 }

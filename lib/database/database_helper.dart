@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:flutter/material.dart';
 import '../models/supplier.dart';
 import '../models/customer.dart';
 import '../models/purchase.dart';
@@ -25,12 +25,6 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-
-    // TEMPORARY: Set this to true to force recreation of the database schema
-    const bool forceRecreate = true;
-    if (forceRecreate) {
-      await deleteDatabase(path);
-    }
 
     return await openDatabase(
       path,

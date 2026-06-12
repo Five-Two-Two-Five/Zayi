@@ -21,16 +21,16 @@ Future<void> main() async {
   // Init local database
   await DatabaseHelper.instance.database;
 
-  runApp(const ProviderScope(child: EggTraderApp()));
+  runApp(const ProviderScope(child: ZayiApp()));
 }
 
-class EggTraderApp extends StatelessWidget {
-  const EggTraderApp({super.key});
+class ZayiApp extends StatelessWidget {
+  const ZayiApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Zayi Egg Trader',
+      title: 'Zayi',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: InstaPalette.accent),

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../features/receipts/presentation/pages/designer_page.dart';
 import '../theme/insta_theme.dart';
 import '../widgets/full_page_add_dialog.dart';
+import '../widgets/form_utils.dart';
 
 class ExpenseScreen extends ConsumerStatefulWidget {
   const ExpenseScreen({super.key});
@@ -196,12 +197,14 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(receiptSettingsProvider);
 
+    final amt = double.tryParse(_amountController.text) ?? 0;
+
     return FullPageAddDialog(
       title: 'Record Expense',
       isSaving: _isSaving,
       onSave: () async {
-        final amt = double.tryParse(_amountController.text);
-        if (amt == null) return;
+        final amtValue = double.tryParse(_amountController.text);
+        if (amtValue == null) return;
 
         setState(() => _isSaving = true);
         try {
@@ -210,7 +213,7 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           
           final expense = Expense(
             expenseType: _selectedType,
-            amount: amt,
+            amount: amtValue,
             description: _descriptionController.text,
             employeeName: _selectedType == 'Employee' ? _employeeNameController.text : null,
             extraDetails: _selectedType == 'Delivery' ? _extraDetailsController.text : null,
@@ -239,90 +242,145 @@ class ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       child: settingsAsync.when(
         data: (settings) => Column(
           children: [
-            ListTile(
-              title: Text(
-                'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                style: const TextStyle(color: InstaPalette.textPrimary),
-              ),
-              trailing: const Icon(Icons.calendar_today, color: InstaPalette.textPrimary),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDate = picked);
-                }
-              },
-            ),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedType,
-              decoration: const InputDecoration(labelText: 'Expense Type *', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-              items: _expenseTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: InstaPalette.textPrimary)))).toList(),
-              onChanged: (val) => setState(() => _selectedType = val!),
-            ),
-            const SizedBox(height: 5),
-            if (_selectedType == 'Employee') ...[
-              TextField(controller: _employeeNameController, decoration: const InputDecoration(labelText: 'Employee Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
-              const SizedBox(height: 5),
-            ],
-            if (_selectedType == 'Delivery') ...[
-              TextField(controller: _extraDetailsController, decoration: const InputDecoration(labelText: 'Vehicle / Route Details *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
-              const SizedBox(height: 5),
-            ],
-            Row(
+            FormSection(
+              title: 'Type & Date',
               children: [
-                Expanded(child: _buildCurrencySelector(settings.baseCurrency)),
-                if (_currencyCode != settings.baseCurrency)
-                  const SizedBox(width: 16),
-                if (_currencyCode != settings.baseCurrency)
-                  Expanded(
-                    child: TextField(
-                      controller: _exchangeRateController,
-                      decoration: const InputDecoration(labelText: 'Exchange Rate *', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
-                    ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+                    style: const TextStyle(color: InstaPalette.textPrimary, fontSize: 14),
                   ),
+                  trailing: const Icon(Icons.calendar_today, color: InstaPalette.accent, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                ),
+                const Text('EXPENSE CATEGORY:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _expenseTypes.map((t) {
+                      final isSelected = _selectedType == t;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: ChoiceChip(
+                          label: Text(t, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                          selected: isSelected,
+                          onSelected: (s) => setState(() => _selectedType = t),
+                          selectedColor: InstaPalette.accent,
+                          backgroundColor: InstaPalette.background,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                          showCheckmark: false,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 5),
-            TextField(controller: _amountController, decoration: const InputDecoration(labelText: 'Amount *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.number, enabled: !_isSaving),
-            const SizedBox(height: 5),
-            TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Description (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), enabled: !_isSaving),
+            
+            FormSection(
+              title: 'Details',
+              children: [
+                if (_selectedType == 'Employee')
+                  TextField(controller: _employeeNameController, decoration: const InputDecoration(labelText: 'Employee Name *'), enabled: !_isSaving),
+                if (_selectedType == 'Delivery')
+                  TextField(controller: _extraDetailsController, decoration: const InputDecoration(labelText: 'Vehicle / Route Details *'), enabled: !_isSaving),
+                TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Description (Optional)'), enabled: !_isSaving),
+              ],
+            ),
+
+            FormSection(
+              title: 'Financials',
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('CURRENCY:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: ['USD', 'ZiG'].map((c) {
+                            final isSelected = _currencyCode == c;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(c, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                                selected: isSelected,
+                                onSelected: (s) {
+                                  setState(() {
+                                    _currencyCode = c;
+                                    if (c == settings.baseCurrency) {
+                                      _exchangeRate = 1.0;
+                                      _exchangeRateController.text = '1.0';
+                                    }
+                                  });
+                                },
+                                selectedColor: InstaPalette.accent,
+                                backgroundColor: InstaPalette.background,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                                showCheckmark: false,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_currencyCode != settings.baseCurrency)
+                  TextField(
+                    controller: _exchangeRateController,
+                    decoration: const InputDecoration(labelText: 'Exchange Rate *'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
+                  ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _amountController, 
+                  decoration: const InputDecoration(labelText: 'Amount *'), 
+                  keyboardType: TextInputType.number, 
+                  enabled: !_isSaving,
+                  onChanged: (v) => setState(() {}),
+                ),
+              ],
+            ),
+
+            if (amt > 0)
+              Container(
+                margin: const EdgeInsets.only(top: 24),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB37B7B).withValues(alpha: 0.1), // Matte Red Tint
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFB37B7B).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Outflow:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text('$_currencyCode ${amt.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFB37B7B))),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 32),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Text('Error: $e'),
       ),
-    );
-  }
-
-  Widget _buildCurrencySelector(String baseCurrency) {
-    final currencies = ['USD', 'ZiG'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Currency *', style: TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
-        DropdownButton<String>(
-          value: _currencyCode,
-          isExpanded: true,
-          items: currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-          onChanged: (v) {
-            if (v != null) {
-              setState(() {
-                _currencyCode = v;
-                if (v == baseCurrency) {
-                  _exchangeRate = 1.0;
-                  _exchangeRateController.text = '1.0';
-                }
-              });
-            }
-          },
-        ),
-      ],
     );
   }
 }

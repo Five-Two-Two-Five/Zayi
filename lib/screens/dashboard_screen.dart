@@ -79,35 +79,65 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: InstaPalette.spacingM),
 
               // Filters
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: ref.watch(currenciesProvider).when(
-                      data: (currencies) {
-                        final String? selectedCurrency = currencyFilter ?? (currencies.isNotEmpty ? currencies.first : null);
-                        return DropdownButtonFormField<String>(
-                          initialValue: selectedCurrency,
-                          decoration: const InputDecoration(labelText: 'Currency', contentPadding: EdgeInsets.symmetric(horizontal: InstaPalette.spacingS, vertical: InstaPalette.spacingS)),
-                          items: currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                          onChanged: (v) => ref.read(dashboardCurrencyFilterProvider.notifier).state = v,
-                        );
-                      },
-                      loading: () => const LinearProgressIndicator(),
-                      error: (e, s) => const Text('Error'),
-                    ),
-                  ),
-                  const SizedBox(width: InstaPalette.spacingM),
-                  Expanded(
-                    child: ref.watch(paymentMethodsProvider).when(
-                      data: (methods) => DropdownButtonFormField<String>(
-                        initialValue: paymentMethodFilter,
-                        decoration: const InputDecoration(labelText: 'Payment Method', contentPadding: EdgeInsets.symmetric(horizontal: InstaPalette.spacingS, vertical: InstaPalette.spacingS)),
-                        items: [null, ...methods].map((m) => DropdownMenuItem(value: m, child: Text(m ?? 'All'))).toList(),
-                        onChanged: (v) => ref.read(dashboardPaymentMethodFilterProvider.notifier).state = v,
+                  const Text('CURRENCY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  ref.watch(currenciesProvider).when(
+                    data: (currencies) => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: currencies.map((c) {
+                          final isSelected = currencyFilter == c;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(c, style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                ref.read(dashboardCurrencyFilterProvider.notifier).state = selected ? c : null;
+                              },
+                              selectedColor: InstaPalette.accent,
+                              backgroundColor: InstaPalette.background,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                              showCheckmark: false,
+                            ),
+                          );
+                        }).toList(),
                       ),
-                      loading: () => const LinearProgressIndicator(),
-                      error: (e, s) => const Text('Error'),
                     ),
+                    loading: () => const LinearProgressIndicator(),
+                    error: (e, s) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('PAYMENT METHOD', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  ref.watch(paymentMethodsProvider).when(
+                    data: (methods) => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [null, ...methods].map((m) {
+                          final isSelected = paymentMethodFilter == m;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(m ?? 'All', style: TextStyle(fontSize: 12, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                ref.read(dashboardPaymentMethodFilterProvider.notifier).state = selected ? m : null;
+                              },
+                              selectedColor: InstaPalette.accent,
+                              backgroundColor: InstaPalette.background,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                              showCheckmark: false,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    loading: () => const LinearProgressIndicator(),
+                    error: (e, s) => const SizedBox.shrink(),
                   ),
                 ],
               ),
@@ -116,9 +146,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               _buildSectionHeader('PERFORMANCE'),
               Row(
                 children: [
-                  Expanded(child: _buildSummaryCard('Total Revenue', summaryAsync, (d) => '${currencyFilter ?? 'Total'} ${(d['revenue'] as num? ?? 0).toStringAsFixed(2)}', isPrimary: true)),
+                  Expanded(
+                    child: _buildSummaryCard(
+                      'Total Revenue', 
+                      summaryAsync, 
+                      (d) => '${currencyFilter ?? 'Total'} ${(d['revenue'] as num? ?? 0).toStringAsFixed(2)}', 
+                      backgroundColor: const Color(0xFF5D7B93), // Matte Blue
+                    ),
+                  ),
                   const SizedBox(width: InstaPalette.spacingM),
-                  Expanded(child: _buildSummaryCard('Net Profit', summaryAsync, (d) => '\$${(d['net_profit'] as num? ?? 0).toStringAsFixed(2)}', isPrimary: true)),
+                  Expanded(
+                    child: _buildSummaryCard(
+                      'Net Profit', 
+                      summaryAsync, 
+                      (d) => '\$${(d['net_profit'] as num? ?? 0).toStringAsFixed(2)}', 
+                      backgroundColor: const Color(0xFF6B8E6B), // Matte Green
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: InstaPalette.spacingL),
@@ -129,6 +173,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   Expanded(child: _buildSummaryCard('Stock Count', inventoryAsync, (d) => '$d ${activeProduct?.unitName ?? 'Units'}', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryBreakdownScreen())))),
                   const SizedBox(width: InstaPalette.spacingM),
                   Expanded(child: _buildSummaryCard('Stock Value', summaryAsync, (d) => '${currencyFilter ?? 'Total'} ${(d['inventory_value'] as num? ?? 0).toStringAsFixed(2)}', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryBreakdownScreen())))),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSummaryCard(
+                      'Customer Debt', 
+                      summaryAsync, 
+                      (d) => '\$${(d['total_debt'] as num? ?? 0).toStringAsFixed(2)}', 
+                      backgroundColor: const Color(0xFFBC8F4F), // Matte Amber
+                    ),
+                  ),
+                  const SizedBox(width: InstaPalette.spacingM),
+                  Expanded(
+                    child: _buildSummaryCard(
+                      'Tax Liability', 
+                      summaryAsync, 
+                      (d) => '\$${(d['tax_liability'] as num? ?? 0).toStringAsFixed(2)}', 
+                      backgroundColor: const Color(0xFFB37B7B), // Matte Red/Rose
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -169,13 +236,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap, bool isPrimary = false}) {
+  Widget _buildSummaryCard(String title, AsyncValue<dynamic> asyncValue, String Function(dynamic) dataMapper, {VoidCallback? onTap, bool isPrimary = false, Color? backgroundColor}) {
     return Card(
       elevation: 0,
-      color: isPrimary ? InstaPalette.textPrimary : InstaPalette.cardBackground,
+      color: backgroundColor ?? (isPrimary ? InstaPalette.textPrimary : InstaPalette.cardBackground),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: isPrimary ? Colors.transparent : InstaPalette.border),
+        side: BorderSide(color: (isPrimary || backgroundColor != null) ? Colors.transparent : InstaPalette.border),
       ),
       child: InkWell(
         onTap: onTap,
@@ -184,11 +251,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           padding: EdgeInsets.symmetric(vertical: isPrimary ? 24 : 16, horizontal: 8),
           child: Column(
             children: [
-              Text(title, style: TextStyle(fontSize: 11, color: isPrimary ? Colors.white70 : InstaPalette.textSecondary)),
+              Text(title, style: TextStyle(fontSize: 11, color: (isPrimary || backgroundColor != null) ? Colors.white70 : InstaPalette.textSecondary)),
               const SizedBox(height: 8),
               asyncValue.when(
-                data: (d) => Text(dataMapper(d), style: TextStyle(fontSize: isPrimary ? 20 : 14, fontWeight: FontWeight.bold, color: isPrimary ? Colors.white : InstaPalette.textPrimary)),
-                loading: () => const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                data: (d) => Text(dataMapper(d), style: TextStyle(fontSize: isPrimary ? 20 : 14, fontWeight: FontWeight.bold, color: (isPrimary || backgroundColor != null) ? Colors.white : InstaPalette.textPrimary)),
+                loading: () => const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
                 error: (e, s) => const Icon(Icons.error_outline, color: Colors.red, size: 20),
               ),
             ],

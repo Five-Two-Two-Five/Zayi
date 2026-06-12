@@ -13,6 +13,7 @@ import 'sale_history_screen.dart';
 import '../theme/insta_theme.dart';
 import '../widgets/full_page_add_dialog.dart';
 import '../widgets/debt_payment_form.dart';
+import '../widgets/form_utils.dart';
 
 class SaleScreen extends ConsumerStatefulWidget {
   const SaleScreen({super.key});
@@ -51,8 +52,28 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                   return Dismissible(
                     key: Key('sale_${s.id}'),
                     direction: DismissDirection.endToStart,
+                    confirmDismiss: (direction) async {
+                      return await showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Confirm Delete'),
+                          content: const Text('Are you sure you want to delete this sale? This action cannot be undone and will adjust inventory.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel', style: TextStyle(color: InstaPalette.textSecondary)),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: TextButton.styleFrom(foregroundColor: const Color(0xFFC05656)), // Matte Red
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     background: Container(
-                      color: Colors.red,
+                      color: const Color(0xFFC05656), // Matte Red
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: const Icon(Icons.delete, color: Colors.white),
@@ -86,9 +107,36 @@ class _SaleScreenState extends ConsumerState<SaleScreen> {
                           );
                           Navigator.push(context, MaterialPageRoute(builder: (_) => SaleHistoryScreen(sale: s, customer: customer)));
                         },
-                        title: Text(
-                          '${s.cratesSold} ${activeProduct?.unitName ?? 'Units'} @ ${s.currencyCode} ${s.sellingPricePerCrate}',
-                          style: const TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${s.cratesSold} ${activeProduct?.unitName ?? 'Units'} @ ${s.currencyCode} ${s.sellingPricePerCrate}',
+                                style: const TextStyle(color: InstaPalette.textPrimary, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: s.balanceDue <= 0 
+                                    ? const Color(0xFF6B8E6B).withValues(alpha: 0.1) // Matte Green
+                                    : const Color(0xFFBC8F4F).withValues(alpha: 0.1), // Matte Amber
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: s.balanceDue <= 0 ? const Color(0xFF6B8E6B) : const Color(0xFFBC8F4F),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Text(
+                                s.balanceDue <= 0 ? 'PAID' : 'DEBT',
+                                style: TextStyle(
+                                  color: s.balanceDue <= 0 ? const Color(0xFF6B8E6B) : const Color(0xFFBC8F4F),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Text(
                           'Revenue: ${s.currencyCode} ${s.totalRevenue.toStringAsFixed(2)}\nDue: ${s.currencyCode} ${s.balanceDue.toStringAsFixed(2)}',
@@ -174,6 +222,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
   double _exchangeRate = 1.0;
   String _paymentMethod = 'Cash';
 
+  bool _showAdvanced = false;
   Map<String, dynamic>? _selectedTax;
   bool _isTaxInclusive = false;
   final _otherMethodController = TextEditingController();
@@ -200,6 +249,22 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
     final activeProduct = ref.watch(activeProductProvider);
 
     final paid = double.tryParse(_paidController.text.isEmpty ? '0' : _paidController.text) ?? 0.0;
+    final crates = double.tryParse(_cratesController.text) ?? 0;
+    final subUnits = double.tryParse(_subUnitsController.text) ?? 0;
+    final price = double.tryParse(_priceController.text) ?? 0;
+    
+    final baseRevenue = (crates * price) + (subUnits * (price / (activeProduct?.subUnitsPerUnit ?? 30)));
+    final taxRate = _selectedTax?['rate'] ?? 0.0;
+    double taxAmount = 0.0;
+    double totalRevenue = 0.0;
+
+    if (_isTaxInclusive) {
+      totalRevenue = baseRevenue;
+      taxAmount = totalRevenue - (totalRevenue / (1 + (taxRate / 100)));
+    } else {
+      taxAmount = baseRevenue * (taxRate / 100);
+      totalRevenue = baseRevenue + taxAmount;
+    }
 
     return FullPageAddDialog(
       title: 'New ${activeProduct?.name ?? 'Sale'}',
@@ -208,7 +273,7 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
         final cratesCount = int.tryParse(_cratesController.text);
         final subUnitsCount = int.tryParse(_subUnitsController.text) ?? 0;
         final price = double.tryParse(_priceController.text);
-        final paid = double.tryParse(_paidController.text.isEmpty ? '0' : _paidController.text) ?? 0.0;
+        final paidValue = double.tryParse(_paidController.text.isEmpty ? '0' : _paidController.text) ?? 0.0;
 
         if ((!_isQuickAddingCustomer && _selectedCustomer == null) ||
             (_isQuickAddingCustomer && _newNameController.text.isEmpty) ||
@@ -237,34 +302,19 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
             await ref.read(customersProvider.notifier).refresh();
           }
 
-          final baseRevenue = (cratesCount * price) + (subUnitsCount * (price / (activeProduct?.subUnitsPerUnit ?? 30)));
-          final taxRate = _selectedTax?['rate'] ?? 0.0;
-          final taxLabel = _selectedTax?['label'];
-          
-          double taxAmount = 0.0;
-          double totalRevenue = 0.0;
-
-          if (_isTaxInclusive) {
-            totalRevenue = baseRevenue;
-            taxAmount = totalRevenue - (totalRevenue / (1 + (taxRate / 100)));
-          } else {
-            taxAmount = baseRevenue * (taxRate / 100);
-            totalRevenue = baseRevenue + taxAmount;
-          }
-
           // Apply Payment Method Charges
           double totalChargeAmount = 0.0;
           String? chargeDescription;
-          if (paid > 0) {
+          if (paidValue > 0) {
             final charges = settings.paymentMethodCharges.where((c) => c.method == _paymentMethod).toList();
             for (var c in charges) {
-              double amt = c.isPercentage ? (paid * (c.value / 100)) : c.value;
+              double amt = c.isPercentage ? (paidValue * (c.value / 100)) : c.value;
               totalChargeAmount += amt;
               chargeDescription = (chargeDescription == null) ? c.description : '$chargeDescription, ${c.description}';
             }
           }
           
-          totalRevenue += totalChargeAmount;
+          final finalRevenue = totalRevenue + totalChargeAmount;
 
           final pos = await LocationService.getCurrentLocation();
           final effectiveRate = _currencyCode == settings.baseCurrency ? 1.0 : _exchangeRate;
@@ -279,13 +329,13 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
             employeeCost: 0,
             taxRate: taxRate,
             taxAmount: taxAmount,
-            taxLabel: taxLabel,
+            taxLabel: _selectedTax?['label'],
             isTaxInclusive: _isTaxInclusive,
-            totalRevenue: totalRevenue,
+            totalRevenue: finalRevenue,
             totalCost: 0,
             profit: 0,
-            amountPaid: paid,
-            balanceDue: totalRevenue - paid,
+            amountPaid: paidValue,
+            balanceDue: finalRevenue - paidValue,
             notes: _notesController.text,
             createdAt: _selectedDate,
             latitude: pos?.latitude ?? 0.0,
@@ -295,10 +345,10 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
           );
 
           final id = await DatabaseHelper.instance.createSale(sale);
-          if (paid > 0) {
+          if (paidValue > 0) {
             await DatabaseHelper.instance.addPayment(
               id, 
-              paid, 
+              paidValue, 
               _paymentMethod == 'Other' ? _otherMethodController.text : _paymentMethod, 
               '',
               chargeAmount: totalChargeAmount,
@@ -323,179 +373,275 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
       child: settingsAsync.when(
         data: (settings) => Column(
           children: [
-            ListTile(
-              title: Text(
-                'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
-                style: const TextStyle(color: InstaPalette.textPrimary),
-              ),
-              trailing: const Icon(Icons.calendar_today, color: InstaPalette.textPrimary),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now().add(const Duration(days: 3650)),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDate = picked);
-                }
-              },
-            ),
-            customersAsync.when(
-              data: (list) {
-                return Column(
-                  children: [
-                    DropdownButtonFormField<dynamic>(
-                      initialValue: _isQuickAddingCustomer ? 'ADD_NEW' : _selectedCustomer,
-                      decoration: const InputDecoration(labelText: 'Customer *', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      items: [
-                        ...list.map((c) => DropdownMenuItem(value: c, child: Text(c.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
-                        const DropdownMenuItem(
-                          value: 'ADD_NEW',
-                          child: Row(children: [Icon(Icons.add, color: InstaPalette.accent), SizedBox(width: 8), Text('Add New Customer', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val == 'ADD_NEW') {
-                          setState(() { _isQuickAddingCustomer = true; _selectedCustomer = null; });
-                        } else {
-                          setState(() { _isQuickAddingCustomer = false; _selectedCustomer = val as Customer; });
-                        }
-                      },
-                    ),
-                    if (_isQuickAddingCustomer) ...[
-                      const SizedBox(height: 5),
-                      TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Customer Name *', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
-                      const SizedBox(height: 5),
-                      TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Customer Phone (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary)), keyboardType: TextInputType.phone),
-                      const Divider(height: 32),
-                    ],
-                  ],
-                );
-              },
-              loading: () => const CircularProgressIndicator(color: InstaPalette.accent),
-              error: (e, s) => const Text('Error loading customers', style: TextStyle(color: Colors.red)),
-            ),
-            const SizedBox(height: 5),
-            Row(
+            FormSection(
+              title: 'Customer & Date',
               children: [
-                Expanded(child: _buildCurrencySelector(settings.baseCurrency)),
-                if (_currencyCode != settings.baseCurrency)
-                  const SizedBox(width: 16),
-                if (_currencyCode != settings.baseCurrency)
-                  Expanded(
-                    child: TextField(
-                      controller: _exchangeRateController,
-                      decoration: const InputDecoration(labelText: 'Exchange Rate *', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
-                    ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}',
+                    style: const TextStyle(color: InstaPalette.textPrimary, fontSize: 14),
                   ),
+                  trailing: const Icon(Icons.calendar_today, color: InstaPalette.accent, size: 18),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now().add(const Duration(days: 3650)),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                ),
+                customersAsync.when(
+                  data: (list) {
+                    return Column(
+                      children: [
+                        DropdownButtonFormField<dynamic>(
+                          initialValue: _isQuickAddingCustomer ? 'ADD_NEW' : _selectedCustomer,
+                          decoration: const InputDecoration(labelText: 'Select Customer *'),
+                          items: [
+                            ...list.map((c) => DropdownMenuItem(value: c, child: Text(c.name, style: const TextStyle(color: InstaPalette.textPrimary)))),
+                            const DropdownMenuItem(
+                              value: 'ADD_NEW',
+                              child: Row(children: [Icon(Icons.add, color: InstaPalette.accent, size: 18), SizedBox(width: 8), Text('Add New Customer', style: TextStyle(color: InstaPalette.accent, fontWeight: FontWeight.bold))]),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val == 'ADD_NEW') {
+                              setState(() { _isQuickAddingCustomer = true; _selectedCustomer = null; });
+                            } else {
+                              setState(() { _isQuickAddingCustomer = false; _selectedCustomer = val as Customer; });
+                            }
+                          },
+                        ),
+                        if (_isQuickAddingCustomer) ...[
+                          const SizedBox(height: 12),
+                          TextField(controller: _newNameController, decoration: const InputDecoration(labelText: 'New Customer Name *')),
+                          const SizedBox(height: 12),
+                          TextField(controller: _newPhoneController, decoration: const InputDecoration(labelText: 'New Customer Phone (Optional)'), keyboardType: TextInputType.phone),
+                        ],
+                      ],
+                    );
+                  },
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, s) => const Text('Error loading customers', style: TextStyle(color: Colors.red)),
+                ),
               ],
             ),
-            const SizedBox(height: 5),
-            Row(
+            
+            FormSection(
+              title: 'Transaction Details',
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _cratesController, 
-                    decoration: InputDecoration(labelText: '${activeProduct?.unitName ?? 'Units'} Sold *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), 
-                    keyboardType: TextInputType.number,
-                    onChanged: (v) => setState(() {}),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('CURRENCY:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: ['USD', 'ZiG'].map((c) {
+                            final isSelected = _currencyCode == c;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(c, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                                selected: isSelected,
+                                onSelected: (s) {
+                                  setState(() {
+                                    _currencyCode = c;
+                                    if (c == settings.baseCurrency) {
+                                      _exchangeRate = 1.0;
+                                      _exchangeRateController.text = '1.0';
+                                    }
+                                  });
+                                },
+                                selectedColor: InstaPalette.accent,
+                                backgroundColor: InstaPalette.background,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                                showCheckmark: false,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                if ((activeProduct?.subUnitsPerUnit ?? 1) > 1) ...[
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: _subUnitsController,
-                      decoration: InputDecoration(labelText: '${activeProduct?.subUnitName ?? 'Sub-units'} Sold', labelStyle: const TextStyle(color: InstaPalette.textSecondary)),
+                if (_currencyCode != settings.baseCurrency)
+                  TextField(
+                    controller: _exchangeRateController,
+                    decoration: const InputDecoration(labelText: 'Exchange Rate *'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (v) => setState(() => _exchangeRate = double.tryParse(v) ?? 1.0),
+                  ),
+                const SizedBox(height: 4),
+                FormRow(
+                  children: [
+                    TextField(
+                      controller: _cratesController, 
+                      decoration: InputDecoration(labelText: '${activeProduct?.unitName ?? 'Units'} *'), 
                       keyboardType: TextInputType.number,
                       onChanged: (v) => setState(() {}),
                     ),
+                    if ((activeProduct?.subUnitsPerUnit ?? 1) > 1)
+                      TextField(
+                        controller: _subUnitsController,
+                        decoration: InputDecoration(labelText: activeProduct?.subUnitName ?? 'Sub-units'),
+                        keyboardType: TextInputType.number,
+                        onChanged: (v) => setState(() {}),
+                      ),
+                  ],
+                ),
+                TextField(
+                  controller: _priceController, 
+                  decoration: InputDecoration(labelText: 'Price per ${activeProduct?.unitName ?? 'Unit'} *'), 
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) => setState(() {}),
+                ),
+              ],
+            ),
+
+            FormSection(
+              title: 'Payment',
+              children: [
+                TextField(
+                  controller: _paidController, 
+                  decoration: const InputDecoration(labelText: 'Amount Paid *'), 
+                  keyboardType: TextInputType.number,
+                  onChanged: (v) => setState(() {}),
+                ),
+                const SizedBox(height: 4),
+                const Text('PAYMENT METHOD:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['Cash', 'Card', 'Ecocash', 'Other'].map((m) {
+                      final isSelected = _paymentMethod == m;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: ChoiceChip(
+                          label: Text(m, style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : InstaPalette.textPrimary)),
+                          selected: isSelected,
+                          onSelected: (s) => setState(() => _paymentMethod = m),
+                          selectedColor: InstaPalette.accent,
+                          backgroundColor: InstaPalette.background,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? Colors.transparent : InstaPalette.border)),
+                          showCheckmark: false,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                if (_paymentMethod != 'Cash' && paid > 0)
+                  _buildChargePreview(settings, paid),
+                if (_paymentMethod == 'Other')
+                  TextField(
+                    controller: _otherMethodController,
+                    decoration: const InputDecoration(labelText: 'Specify Method *'),
+                  ),
+              ],
+            ),
+
+            // Summary Banner
+            if (baseRevenue > 0)
+              Container(
+                margin: const EdgeInsets.only(top: 24),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5D7B93).withValues(alpha: 0.1), // Matte Blue Tint
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF5D7B93).withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Transaction Total:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        Text('$_currencyCode ${totalRevenue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF5D7B93))),
+                      ],
+                    ),
+                    if (taxAmount > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Incl. ${_selectedTax?['label']} (${_selectedTax?['rate']}%):', style: const TextStyle(fontSize: 11, color: InstaPalette.textSecondary)),
+                            Text('$_currencyCode ${taxAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, color: InstaPalette.textSecondary)),
+                          ],
+                        ),
+                      ),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Balance Due:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        Text(
+                          '$_currencyCode ${(totalRevenue - paid).toStringAsFixed(2)}', 
+                          style: TextStyle(
+                            fontSize: 16, 
+                            fontWeight: FontWeight.bold, 
+                            color: (totalRevenue - paid) > 0 ? const Color(0xFFBC8F4F) : const Color(0xFF6B8E6B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+            // Advanced Toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: TextButton.icon(
+                onPressed: () => setState(() => _showAdvanced = !_showAdvanced),
+                icon: Icon(_showAdvanced ? Icons.expand_less : Icons.expand_more, size: 18),
+                label: Text(_showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings (Tax, Notes)'),
+                style: TextButton.styleFrom(foregroundColor: InstaPalette.textSecondary, textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ),
+
+            if (_showAdvanced)
+              FormSection(
+                title: 'Advanced Settings',
+                children: [
+                  DropdownButtonFormField<Map<String, dynamic>?>(
+                    initialValue: _selectedTax,
+                    decoration: const InputDecoration(labelText: 'Applied Tax'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('No Tax (0%)')),
+                      ...settings.predefinedTaxes.map((tax) => DropdownMenuItem(
+                        value: tax,
+                        child: Text('${tax['label']} (${tax['rate']}%)'),
+                      )),
+                    ],
+                    onChanged: (val) => setState(() => _selectedTax = val),
+                  ),
+                  if (_selectedTax != null)
+                    SwitchListTile(
+                      title: const Text('Tax is Inclusive', style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('Amount already includes tax', style: TextStyle(fontSize: 11)),
+                      value: _isTaxInclusive,
+                      onChanged: (v) => setState(() => _isTaxInclusive = v),
+                      contentPadding: EdgeInsets.zero,
+                      activeThumbColor: InstaPalette.accent,
+                    ),
+                  TextField(
+                    controller: _notesController, 
+                    decoration: const InputDecoration(labelText: 'Notes (Optional)'),
+                    maxLines: 2,
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 5),
-            TextField(
-              controller: _priceController, 
-              decoration: InputDecoration(labelText: 'Price per ${activeProduct?.unitName ?? 'Unit'} *', labelStyle: const TextStyle(color: InstaPalette.textSecondary)), 
-              keyboardType: TextInputType.number,
-              onChanged: (v) => setState(() {}),
-            ),
-            
-            const SizedBox(height: 5),
-            // Expected Amount Read-only field
-            Builder(
-              builder: (context) {
-                final crates = double.tryParse(_cratesController.text) ?? 0;
-                final subUnits = double.tryParse(_subUnitsController.text) ?? 0;
-                final price = double.tryParse(_priceController.text) ?? 0;
-                final expected = (crates * price) + (subUnits * (price / (activeProduct?.subUnitsPerUnit ?? 30)));
-                return TextField(
-                  controller: TextEditingController(text: expected > 0 ? expected.toStringAsFixed(2) : ''),
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Expected Amount (Base)',
-                    labelStyle: TextStyle(color: InstaPalette.accent),
-                    prefixIcon: Icon(Icons.calculate_outlined, color: InstaPalette.accent),
-                    filled: true,
-                  ),
-                );
-              },
-            ),
-            
-            const SizedBox(height: 24),
-            const Text('TAX SETTINGS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: InstaPalette.textSecondary)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<Map<String, dynamic>?>(
-              initialValue: _selectedTax,
-              decoration: const InputDecoration(labelText: 'Applied Tax', labelStyle: TextStyle(color: InstaPalette.textSecondary)),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('No Tax (0%)')),
-                ...settings.predefinedTaxes.map((tax) => DropdownMenuItem(
-                  value: tax,
-                  child: Text('${tax['label']} (${tax['rate']}%)'),
-                )),
-              ],
-              onChanged: (val) => setState(() => _selectedTax = val),
-            ),
-            if (_selectedTax != null)
-              SwitchListTile(
-                title: const Text('Tax is Inclusive', style: TextStyle(fontSize: 14)),
-                subtitle: const Text('Amount already includes tax', style: TextStyle(fontSize: 11)),
-                value: _isTaxInclusive,
-                onChanged: (v) => setState(() => _isTaxInclusive = v),
-                contentPadding: EdgeInsets.zero,
-                activeThumbColor: InstaPalette.accent,
               ),
-            
-            const SizedBox(height: 5),
-            TextField(
-              controller: _paidController, 
-              decoration: const InputDecoration(labelText: 'Amount Paid *', labelStyle: TextStyle(color: InstaPalette.textSecondary)), 
-              keyboardType: TextInputType.number,
-              onChanged: (v) => setState(() {}),
-            ),
-            const SizedBox(height: 5),
-            DropdownButtonFormField<String>(
-              initialValue: _paymentMethod,
-              items: ['Cash', 'Card', 'Ecocash', 'Other'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-              onChanged: (val) => setState(() => _paymentMethod = val!),
-              decoration: const InputDecoration(labelText: 'Payment Method *'),
-            ),
-            if (_paymentMethod != 'Cash' && paid > 0)
-              _buildChargePreview(settings, paid),
-            if (_paymentMethod == 'Other') ...[
-              const SizedBox(height: 5),
-              TextField(
-                controller: _otherMethodController,
-                decoration: const InputDecoration(labelText: 'Specify Method *'),
-              ),
-            ],
-            const SizedBox(height: 5),
-            TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes (Optional)', labelStyle: TextStyle(color: InstaPalette.textSecondary))),
+            const SizedBox(height: 32),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -536,32 +682,6 @@ class _SaleFormPageState extends ConsumerState<SaleFormPage> {
           }),
         ],
       ),
-    );
-  }
-
-  Widget _buildCurrencySelector(String baseCurrency) {
-    final currencies = ['USD', 'ZiG'];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Currency *', style: TextStyle(fontSize: 12, color: InstaPalette.textSecondary)),
-        DropdownButton<String>(
-          value: _currencyCode,
-          isExpanded: true,
-          items: currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-          onChanged: (v) {
-            if (v != null) {
-              setState(() {
-                _currencyCode = v;
-                if (v == baseCurrency) {
-                  _exchangeRate = 1.0;
-                  _exchangeRateController.text = '1.0';
-                }
-              });
-            }
-          },
-        ),
-      ],
     );
   }
 }
