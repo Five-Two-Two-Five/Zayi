@@ -5,6 +5,10 @@ class Supplier {
   final String location;
   final String notes;
   final DateTime createdAt;
+  final String? uuid;
+  final DateTime? lastUpdated;
+  final bool isSynced;
+  final bool isDeleted;
 
   Supplier({
     this.id,
@@ -13,6 +17,10 @@ class Supplier {
     required this.location,
     required this.notes,
     required this.createdAt,
+    this.uuid,
+    this.lastUpdated,
+    this.isSynced = false,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +31,10 @@ class Supplier {
       'location': location,
       'notes': notes,
       'created_at': createdAt.toIso8601String(),
+      'uuid': uuid,
+      'last_updated': lastUpdated?.toIso8601String(),
+      'is_synced': isSynced ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -34,6 +46,10 @@ class Supplier {
       location: map['location'] ?? '',
       notes: map['notes'] ?? '',
       createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
+      uuid: map['uuid'],
+      lastUpdated: map['last_updated'] != null ? DateTime.parse(map['last_updated']) : null,
+      isSynced: (map['is_synced'] as int?) == 1,
+      isDeleted: (map['is_deleted'] as int?) == 1,
     );
   }
 
@@ -44,6 +60,10 @@ class Supplier {
     String? location,
     String? notes,
     DateTime? createdAt,
+    String? uuid,
+    DateTime? lastUpdated,
+    bool? isSynced,
+    bool? isDeleted,
   }) {
     return Supplier(
       id: id ?? this.id,
@@ -52,6 +72,10 @@ class Supplier {
       location: location ?? this.location,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      uuid: uuid ?? this.uuid,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      isSynced: isSynced ?? this.isSynced,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

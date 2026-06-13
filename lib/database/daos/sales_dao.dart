@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import '../../models/sale.dart';
 import '../../models/purchase.dart';
 import 'product_dao.dart';
+import '../database_helper.dart';
 
 class SalesDao {
   final Database db;
@@ -14,10 +15,13 @@ class SalesDao {
     int offset = 0,
     int? productId,
   }) async {
+    final where = productId != null ? 'product_id = ? AND is_deleted = 0' : 'is_deleted = 0';
+    final whereArgs = productId != null ? [productId] : null;
+
     final result = await db.query(
       'sales',
-      where: productId != null ? 'product_id = ?' : null,
-      whereArgs: productId != null ? [productId] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'created_at DESC',
       limit: limit,
       offset: offset,
@@ -28,6 +32,7 @@ class SalesDao {
   Future<int> create(Sale sale) async {
     final product = await productDao.getById(sale.productId);
     final ratio = product?.subUnitsPerUnit ?? 30;
+    final syncData = DatabaseHelper.generateSyncData();
 
     return await db.transaction((txn) async {
       // 1. Check inventory balance (in primary units)
@@ -73,7 +78,11 @@ class SalesDao {
         // Update purchase record
         await txn.update(
           'purchases',
-          {'remaining_eggs': available - consumed},
+          {
+            'remaining_eggs': available - consumed,
+            'last_updated': DateTime.now().toIso8601String(),
+            'is_synced': 0,
+          },
           where: 'id = ?',
           whereArgs: [purchase.id],
         );
@@ -95,7 +104,7 @@ class SalesDao {
         totalCOGS += subUnitsToConsume * fallbackPrice;
       }
 
-      // 4. Create the sale with the calculated COGS
+      // 4. Create the sale with the calculated COGS and sync data
       final revenue = sale.totalRevenue;
       final finalTotalCost = totalCOGS + sale.deliveryCost + sale.employeeCost;
       final finalProfit = revenue - finalTotalCost;
@@ -103,17 +112,26 @@ class SalesDao {
       final updatedSale = sale.copyWith(
         totalCost: finalTotalCost,
         profit: finalProfit,
+        uuid: syncData['uuid'],
+        lastUpdated: DateTime.parse(syncData['last_updated']),
+        isSynced: false,
+        isDeleted: false,
       );
 
       final id = await txn.insert('sales', updatedSale.toMap());
 
       // 5. Update inventory (unit balance)
+      final inventorySyncData = DatabaseHelper.instance.generateSyncData();
       await txn.insert('inventory', {
         'product_id': sale.productId,
         'trays_in': 0,
         'trays_out': sale.cratesSold,
         'balance': currentUnitBalance - sale.cratesSold,
         'created_at': sale.createdAt.toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
 
       return id;
@@ -121,14 +139,22 @@ class SalesDao {
   }
 
   Future<Sale?> getById(int id) async {
-    final result = await db.query('sales', where: 'id = ?', whereArgs: [id]);
+    final result = await db.query(
+      'sales',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
     return result.isNotEmpty ? Sale.fromMap(result.first) : null;
   }
 
   Future<int> update(Sale sale) async {
+    final updatedSale = sale.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'sales',
-      sale.toMap(),
+      updatedSale.toMap(),
       where: 'id = ?',
       whereArgs: [sale.id],
     );
@@ -145,8 +171,13 @@ class SalesDao {
       final crates = saleResult.first['trays_sold'] as int;
       final productId = saleResult.first['product_id'] as int;
       
-      final count = await txn.delete(
+      final count = await txn.update(
         'sales',
+        {
+          'is_deleted': 1,
+          'last_updated': DateTime.now().toIso8601String(),
+          'is_synced': 0,
+        },
         where: 'id = ?',
         whereArgs: [saleId],
       );
@@ -162,12 +193,17 @@ class SalesDao {
           ? lastInventory.first['balance'] as int
           : 0;
           
+      final inventorySyncData = DatabaseHelper.instance.generateSyncData();
       await txn.insert('inventory', {
         'product_id': productId,
         'trays_in': crates,
         'trays_out': 0,
         'balance': currentBalance + crates,
         'created_at': DateTime.now().toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
       return count;
     });

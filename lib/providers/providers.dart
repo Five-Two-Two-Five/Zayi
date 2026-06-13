@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart' as thermal;
+import 'package:firebase_auth/firebase_auth.dart';
 import '../database/database_helper.dart';
 import '../models/supplier.dart';
 import '../models/customer.dart';
@@ -11,6 +12,18 @@ import '../models/fixed_asset.dart';
 import '../models/equity_transaction.dart';
 import '../models/receipt_settings.dart';
 import '../models/product.dart';
+import '../services/auth_service.dart';
+import '../services/sync_service.dart';
+
+// Auth Providers
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+
+final authStateProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authServiceProvider).user;
+});
+
+// Sync Providers
+final syncServiceProvider = Provider<SyncService>((ref) => SyncService());
 
 // Product Providers
 final productsProvider = AsyncNotifierProvider<ProductsNotifier, List<Product>>(() {

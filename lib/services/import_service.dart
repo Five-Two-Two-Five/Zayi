@@ -7,7 +7,7 @@ import '../database/database_helper.dart';
 
 class ImportService {
   static Future<int> importFromCsv(String tableName) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv'],
     );

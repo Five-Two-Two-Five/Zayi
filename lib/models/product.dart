@@ -5,6 +5,10 @@ class Product {
   final String? subUnitName; // e.g., "Egg", null for Chickens
   final int subUnitsPerUnit; // e.g., 30 for Eggs, 1 for Chickens
   final String? icon;
+  final String? uuid;
+  final DateTime? lastUpdated;
+  final bool isSynced;
+  final bool isDeleted;
 
   Product({
     this.id,
@@ -13,6 +17,10 @@ class Product {
     this.subUnitName,
     this.subUnitsPerUnit = 1,
     this.icon,
+    this.uuid,
+    this.lastUpdated,
+    this.isSynced = false,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +31,10 @@ class Product {
       'sub_unit_name': subUnitName,
       'sub_units_per_unit': subUnitsPerUnit,
       'icon': icon,
+      'uuid': uuid,
+      'last_updated': lastUpdated?.toIso8601String(),
+      'is_synced': isSynced ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -34,6 +46,10 @@ class Product {
       subUnitName: map['sub_unit_name'],
       subUnitsPerUnit: map['sub_units_per_unit'] ?? 1,
       icon: map['icon'],
+      uuid: map['uuid'],
+      lastUpdated: map['last_updated'] != null ? DateTime.parse(map['last_updated']) : null,
+      isSynced: (map['is_synced'] as int?) == 1,
+      isDeleted: (map['is_deleted'] as int?) == 1,
     );
   }
 
@@ -44,6 +60,10 @@ class Product {
     String? subUnitName,
     int? subUnitsPerUnit,
     String? icon,
+    String? uuid,
+    DateTime? lastUpdated,
+    bool? isSynced,
+    bool? isDeleted,
   }) {
     return Product(
       id: id ?? this.id,
@@ -52,6 +72,10 @@ class Product {
       subUnitName: subUnitName ?? this.subUnitName,
       subUnitsPerUnit: subUnitsPerUnit ?? this.subUnitsPerUnit,
       icon: icon ?? this.icon,
+      uuid: uuid ?? this.uuid,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      isSynced: isSynced ?? this.isSynced,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

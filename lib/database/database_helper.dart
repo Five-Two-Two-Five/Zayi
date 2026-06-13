@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 import '../models/supplier.dart';
 import '../models/customer.dart';
 import '../models/purchase.dart';
@@ -9,10 +10,12 @@ import '../models/expense.dart';
 import '../models/inventory.dart';
 import '../models/fixed_asset.dart';
 import '../models/product.dart';
+import '../models/equity_transaction.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+  static const _uuid = Uuid();
 
   DatabaseHelper._init();
 
@@ -26,10 +29,12 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
+    return openDatabase(
       path,
-      version: 29,
-      onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
+      version: 30,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -57,6 +62,32 @@ class DatabaseHelper {
       'payment_method',
       'TEXT DEFAULT "Other"',
     );
+
+    if (oldVersion < 30) {
+      debugPrint('Running migration to 30: Sync support');
+      final tables = [
+        'products',
+        'suppliers',
+        'customers',
+        'purchases',
+        'sales',
+        'expenses',
+        'inventory',
+        'fixed_assets',
+        'equity_ledger',
+        'receipt_settings',
+        'sale_payments',
+      ];
+
+      for (var table in tables) {
+        await _addColumnIfNotExists(db, table, 'uuid', 'TEXT UNIQUE');
+        await _addColumnIfNotExists(db, table, 'last_updated', 'TEXT');
+        await _addColumnIfNotExists(db, table, 'is_synced', 'INTEGER DEFAULT 0');
+        await _addColumnIfNotExists(db, table, 'is_deleted', 'INTEGER DEFAULT 0');
+      }
+
+      await _migrateToSync(db, tables);
+    }
 
     // Ensure existing data is not NULL after migration
 
@@ -206,6 +237,7 @@ class DatabaseHelper {
     const intType = 'INTEGER NOT NULL';
     const realType = 'REAL NOT NULL';
     const textTypeNullable = 'TEXT';
+    const syncColumns = 'uuid TEXT UNIQUE, last_updated TEXT, is_synced INTEGER DEFAULT 0, is_deleted INTEGER DEFAULT 0';
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS products (
@@ -214,7 +246,8 @@ class DatabaseHelper {
         unit_name $textType,
         sub_unit_name $textTypeNullable,
         sub_units_per_unit $intType DEFAULT 1,
-        icon $textTypeNullable
+        icon $textTypeNullable,
+        $syncColumns
       )
     ''');
 
@@ -241,7 +274,8 @@ class DatabaseHelper {
         phone $textType,
         location $textType,
         notes $textType,
-        created_at $textType
+        created_at $textType,
+        $syncColumns
       )
     ''');
 
@@ -252,7 +286,8 @@ class DatabaseHelper {
         phone $textType,
         location $textType,
         notes $textType,
-        created_at $textType
+        created_at $textType,
+        $syncColumns
       )
     ''');
 
@@ -277,7 +312,8 @@ class DatabaseHelper {
         exchange_rate REAL DEFAULT 1.0,
         payment_method TEXT DEFAULT "Other",
         FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
-        FOREIGN KEY (product_id) REFERENCES products (id)
+        FOREIGN KEY (product_id) REFERENCES products (id),
+        $syncColumns
       )
     ''');
 
@@ -307,7 +343,8 @@ class DatabaseHelper {
         currency_code TEXT DEFAULT "USD",
         exchange_rate REAL DEFAULT 1.0,
         FOREIGN KEY (customer_id) REFERENCES customers (id),
-        FOREIGN KEY (product_id) REFERENCES products (id)
+        FOREIGN KEY (product_id) REFERENCES products (id),
+        $syncColumns
       )
     ''');
 
@@ -323,7 +360,8 @@ class DatabaseHelper {
         latitude $realType,
         longitude $realType,
         currency_code TEXT DEFAULT "USD",
-        exchange_rate REAL DEFAULT 1.0
+        exchange_rate REAL DEFAULT 1.0,
+        $syncColumns
       )
     ''');
 
@@ -335,7 +373,8 @@ class DatabaseHelper {
         trays_out $intType,
         balance $intType,
         created_at $textType,
-        FOREIGN KEY (product_id) REFERENCES products (id)
+        FOREIGN KEY (product_id) REFERENCES products (id),
+        $syncColumns
       )
     ''');
 
@@ -349,7 +388,8 @@ class DatabaseHelper {
         residual_value $realType,
         notes $textTypeNullable,
         currency_code TEXT DEFAULT "USD",
-        exchange_rate REAL DEFAULT 1.0
+        exchange_rate REAL DEFAULT 1.0,
+        $syncColumns
       )
     ''');
 
@@ -361,7 +401,8 @@ class DatabaseHelper {
         notes $textTypeNullable,
         created_at $textType,
         currency_code TEXT DEFAULT "USD",
-        exchange_rate REAL DEFAULT 1.0
+        exchange_rate REAL DEFAULT 1.0,
+        $syncColumns
       )
     ''');
 
@@ -380,7 +421,8 @@ class DatabaseHelper {
         base_currency TEXT DEFAULT "USD",
         predefined_taxes TEXT,
         payment_method_charges TEXT,
-        remembered_printer_address TEXT
+        remembered_printer_address TEXT,
+        $syncColumns
       )
     ''');
 
@@ -394,7 +436,8 @@ class DatabaseHelper {
         other_details TEXT,
         charge_amount REAL DEFAULT 0.0,
         charge_description TEXT,
-        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
+        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+        $syncColumns
       )
     ''');
 
@@ -417,26 +460,45 @@ class DatabaseHelper {
   // Products
   Future<int> createProduct(Product product) async {
     final db = await instance.database;
-    return await db.insert('products', product.toMap());
+    final syncData = generateSyncData();
+    final updatedProduct = product.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('products', updatedProduct.toMap());
   }
 
   Future<List<Product>> getAllProducts() async {
     final db = await instance.database;
-    final result = await db.query('products', orderBy: 'name ASC');
+    final result = await db.query(
+      'products',
+      where: 'is_deleted = 0',
+      orderBy: 'name ASC',
+    );
     return result.map((json) => Product.fromMap(json)).toList();
   }
 
   Future<Product?> getProductById(int id) async {
     final db = await instance.database;
-    final result = await db.query('products', where: 'id = ?', whereArgs: [id]);
+    final result = await db.query(
+      'products',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
     return result.isNotEmpty ? Product.fromMap(result.first) : null;
   }
 
   Future<int> updateProduct(Product product) async {
     final db = await instance.database;
+    final updatedProduct = product.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'products',
-      product.toMap(),
+      updatedProduct.toMap(),
       where: 'id = ?',
       whereArgs: [product.id],
     );
@@ -444,26 +506,50 @@ class DatabaseHelper {
 
   Future<int> deleteProduct(int id) async {
     final db = await instance.database;
-    return await db.delete('products', where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'products',
+      {
+        'is_deleted': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // Suppliers
   Future<int> createSupplier(Supplier supplier) async {
     final db = await instance.database;
-    return await db.insert('suppliers', supplier.toMap());
+    final syncData = generateSyncData();
+    final updatedSupplier = supplier.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('suppliers', updatedSupplier.toMap());
   }
 
   Future<List<Supplier>> getAllSuppliers() async {
     final db = await instance.database;
-    final result = await db.query('suppliers', orderBy: 'name ASC');
+    final result = await db.query(
+      'suppliers',
+      where: 'is_deleted = 0',
+      orderBy: 'name ASC',
+    );
     return result.map((json) => Supplier.fromMap(json)).toList();
   }
 
   Future<int> updateSupplier(Supplier supplier) async {
     final db = await instance.database;
+    final updatedSupplier = supplier.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'suppliers',
-      supplier.toMap(),
+      updatedSupplier.toMap(),
       where: 'id = ?',
       whereArgs: [supplier.id],
     );
@@ -472,20 +558,35 @@ class DatabaseHelper {
   // Customers
   Future<int> createCustomer(Customer customer) async {
     final db = await instance.database;
-    return await db.insert('customers', customer.toMap());
+    final syncData = generateSyncData();
+    final updatedCustomer = customer.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('customers', updatedCustomer.toMap());
   }
 
   Future<List<Customer>> getAllCustomers() async {
     final db = await instance.database;
-    final result = await db.query('customers', orderBy: 'name ASC');
+    final result = await db.query(
+      'customers',
+      where: 'is_deleted = 0',
+      orderBy: 'name ASC',
+    );
     return result.map((json) => Customer.fromMap(json)).toList();
   }
 
   Future<int> updateCustomer(Customer customer) async {
     final db = await instance.database;
+    final updatedCustomer = customer.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'customers',
-      customer.toMap(),
+      updatedCustomer.toMap(),
       where: 'id = ?',
       whereArgs: [customer.id],
     );
@@ -496,11 +597,16 @@ class DatabaseHelper {
     final db = await instance.database;
     final product = await getProductById(purchase.productId);
     final ratio = product?.subUnitsPerUnit ?? 30;
+    final syncData = generateSyncData();
 
     return await db.transaction((txn) async {
       // Initialize remaining sub-units for FIFO tracking
       final updatedPurchase = purchase.copyWith(
         remainingEggs: purchase.crates * ratio,
+        uuid: syncData['uuid'],
+        lastUpdated: DateTime.parse(syncData['last_updated']),
+        isSynced: false,
+        isDeleted: false,
       );
       final id = await txn.insert('purchases', updatedPurchase.toMap());
 
@@ -516,12 +622,17 @@ class DatabaseHelper {
           ? lastInventory.first['balance'] as int
           : 0;
 
+      final inventorySyncData = generateSyncData();
       await txn.insert('inventory', {
         'product_id': purchase.productId,
         'trays_in': purchase.crates,
         'trays_out': 0,
         'balance': currentBalance + purchase.crates,
         'created_at': purchase.createdAt.toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
 
       return id;
@@ -530,10 +641,13 @@ class DatabaseHelper {
 
   Future<List<Purchase>> getAllPurchases({int? productId}) async {
     final db = await instance.database;
+    final where = productId != null ? 'product_id = ? AND is_deleted = 0' : 'is_deleted = 0';
+    final whereArgs = productId != null ? [productId] : null;
+
     final result = await db.query(
       'purchases',
-      where: productId != null ? 'product_id = ?' : null,
-      whereArgs: productId != null ? [productId] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'created_at DESC',
     );
     return result.map((json) => Purchase.fromMap(json)).toList();
@@ -546,10 +660,13 @@ class DatabaseHelper {
     int? productId,
   }) async {
     final db = await instance.database;
+    final where = productId != null ? 'product_id = ? AND is_deleted = 0' : 'is_deleted = 0';
+    final whereArgs = productId != null ? [productId] : null;
+
     final result = await db.query(
       'sales',
-      where: productId != null ? 'product_id = ?' : null,
-      whereArgs: productId != null ? [productId] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'created_at DESC',
       limit: limit,
       offset: offset,
@@ -561,6 +678,7 @@ class DatabaseHelper {
     final db = await instance.database;
     final product = await getProductById(sale.productId);
     final ratio = product?.subUnitsPerUnit ?? 30;
+    final syncData = generateSyncData();
 
     return await db.transaction((txn) async {
       // 1. Check inventory balance (in primary units)
@@ -600,7 +718,6 @@ class DatabaseHelper {
             ? available
             : subUnitsToConsume;
 
-        // Note: pricePerEgg is (totalCost / (crates * ratio))
         totalCOGS +=
             consumed * (purchase.totalCost / (purchase.crates * ratio));
         subUnitsToConsume -= consumed;
@@ -608,7 +725,11 @@ class DatabaseHelper {
         // Update purchase record
         await txn.update(
           'purchases',
-          {'remaining_eggs': available - consumed},
+          {
+            'remaining_eggs': available - consumed,
+            'last_updated': DateTime.now().toIso8601String(),
+            'is_synced': 0,
+          },
           where: 'id = ?',
           whereArgs: [purchase.id],
         );
@@ -630,7 +751,7 @@ class DatabaseHelper {
         totalCOGS += subUnitsToConsume * fallbackPrice;
       }
 
-      // 4. Create the sale with the calculated COGS
+      // 4. Create the sale with the calculated COGS and sync data
       final revenue = sale.totalRevenue;
       final finalTotalCost = totalCOGS + sale.deliveryCost + sale.employeeCost;
       final finalProfit = revenue - finalTotalCost;
@@ -638,17 +759,26 @@ class DatabaseHelper {
       final updatedSale = sale.copyWith(
         totalCost: finalTotalCost,
         profit: finalProfit,
+        uuid: syncData['uuid'],
+        lastUpdated: DateTime.parse(syncData['last_updated']),
+        isSynced: false,
+        isDeleted: false,
       );
 
       final id = await txn.insert('sales', updatedSale.toMap());
 
       // 5. Update inventory (unit balance)
+      final inventorySyncData = generateSyncData();
       await txn.insert('inventory', {
         'product_id': sale.productId,
         'trays_in': 0,
         'trays_out': sale.cratesSold,
         'balance': currentUnitBalance - sale.cratesSold,
         'created_at': sale.createdAt.toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
 
       return id;
@@ -657,15 +787,23 @@ class DatabaseHelper {
 
   Future<Sale?> getSaleById(int id) async {
     final db = await instance.database;
-    final result = await db.query('sales', where: 'id = ?', whereArgs: [id]);
+    final result = await db.query(
+      'sales',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
     return result.isNotEmpty ? Sale.fromMap(result.first) : null;
   }
 
   Future<int> updateSale(Sale sale) async {
     final db = await instance.database;
+    final updatedSale = sale.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'sales',
-      sale.toMap(),
+      updatedSale.toMap(),
       where: 'id = ?',
       whereArgs: [sale.id],
     );
@@ -674,22 +812,36 @@ class DatabaseHelper {
   // Expenses
   Future<int> createExpense(Expense expense) async {
     final db = await instance.database;
-    return await db.insert('expenses', expense.toMap());
+    final syncData = generateSyncData();
+    final updatedExpense = expense.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('expenses', updatedExpense.toMap());
   }
 
   Future<List<Expense>> getAllExpenses() async {
     final db = await instance.database;
-    final result = await db.query('expenses', orderBy: 'created_at DESC');
+    final result = await db.query(
+      'expenses',
+      where: 'is_deleted = 0',
+      orderBy: 'created_at DESC',
+    );
     return result.map((json) => Expense.fromMap(json)).toList();
   }
 
   // Inventory
   Future<int> getInventoryBalance({int? productId}) async {
     final db = await instance.database;
+    final where = productId != null ? 'product_id = ? AND is_deleted = 0' : 'is_deleted = 0';
+    final whereArgs = productId != null ? [productId] : null;
+
     final result = await db.query(
       'inventory',
-      where: productId != null ? 'product_id = ?' : null,
-      whereArgs: productId != null ? [productId] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'id DESC',
       limit: 1,
     );
@@ -698,58 +850,98 @@ class DatabaseHelper {
 
   Future<List<Inventory>> getInventoryHistory({int? productId}) async {
     final db = await instance.database;
+    final where = productId != null ? 'product_id = ? AND is_deleted = 0' : 'is_deleted = 0';
+    final whereArgs = productId != null ? [productId] : null;
+
     final result = await db.query(
       'inventory',
-      where: productId != null ? 'product_id = ?' : null,
-      whereArgs: productId != null ? [productId] : null,
+      where: where,
+      whereArgs: whereArgs,
       orderBy: 'created_at DESC',
     );
     return result.map((json) => Inventory.fromMap(json)).toList();
   }
 
   // Fixed Assets
-  Future<int> createFixedAsset(Map<String, dynamic> asset) async {
+  Future<int> createFixedAsset(Map<String, dynamic> assetMap) async {
     final db = await instance.database;
-    return await db.insert('fixed_assets', asset);
+    final asset = FixedAsset.fromMap(assetMap);
+    final syncData = generateSyncData();
+    final updatedAsset = asset.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('fixed_assets', updatedAsset.toMap());
   }
 
   Future<List<Map<String, dynamic>>> getAllFixedAssets() async {
     final db = await instance.database;
-    return await db.query('fixed_assets', orderBy: 'purchase_date DESC');
+    return await db.query(
+      'fixed_assets',
+      where: 'is_deleted = 0',
+      orderBy: 'purchase_date DESC',
+    );
   }
 
   Future<int> deleteFixedAsset(int id) async {
     final db = await instance.database;
-    return await db.delete('fixed_assets', where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'fixed_assets',
+      {
+        'is_deleted': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> updateFixedAsset(FixedAsset asset) async {
     final db = await instance.database;
+    final updatedAsset = asset.copyWith(
+      lastUpdated: DateTime.now(),
+      isSynced: false,
+    );
     return await db.update(
       'fixed_assets',
-      asset.toMap(),
+      updatedAsset.toMap(),
       where: 'id = ?',
       whereArgs: [asset.id],
     );
   }
 
   // Equity Ledger
-  Future<int> createEquityTransaction(Map<String, dynamic> transaction) async {
+  Future<int> createEquityTransaction(Map<String, dynamic> transactionMap) async {
     final db = await instance.database;
-    return await db.insert('equity_ledger', transaction);
+    final transaction = EquityTransaction.fromMap(transactionMap);
+    final syncData = generateSyncData();
+    final updatedTransaction = transaction.copyWith(
+      uuid: syncData['uuid'],
+      lastUpdated: DateTime.parse(syncData['last_updated']),
+      isSynced: false,
+      isDeleted: false,
+    );
+    return await db.insert('equity_ledger', updatedTransaction.toMap());
   }
 
   Future<List<Map<String, dynamic>>> getAllEquityTransactions() async {
     final db = await instance.database;
-    return await db.query('equity_ledger', orderBy: 'created_at DESC');
+    return await db.query(
+      'equity_ledger',
+      where: 'is_deleted = 0',
+      orderBy: 'created_at DESC',
+    );
   }
 
   Future<double> getTotalEquity({String? currency}) async {
     final db = await instance.database;
-    String where = '';
+    String where = 'WHERE is_deleted = 0';
     List<dynamic> args = [];
     if (currency != null) {
-      where = 'WHERE currency_code = ?';
+      where += ' AND currency_code = ?';
       args.add(currency);
     }
     final result = await db.rawQuery(
@@ -769,6 +961,7 @@ class DatabaseHelper {
     String? chargeDescription,
   }) async {
     final db = await instance.database;
+    final syncData = generateSyncData();
     return await db.insert('sale_payments', {
       'sale_id': saleId,
       'amount': amount,
@@ -777,6 +970,10 @@ class DatabaseHelper {
       'other_details': details,
       'charge_amount': chargeAmount,
       'charge_description': chargeDescription,
+      'uuid': syncData['uuid'],
+      'last_updated': syncData['last_updated'],
+      'is_synced': 0,
+      'is_deleted': 0,
     });
   }
 
@@ -784,7 +981,7 @@ class DatabaseHelper {
     final db = await instance.database;
     return await db.query(
       'sale_payments',
-      where: 'sale_id = ?',
+      where: 'sale_id = ? AND is_deleted = 0',
       whereArgs: [saleId],
       orderBy: 'created_at DESC',
     );
@@ -801,7 +998,7 @@ class DatabaseHelper {
     final db = await instance.database;
 
     String paymentJoin = '';
-    List<String> filters = [];
+    List<String> filters = ['s.is_deleted = 0'];
 
     if (start != null && end != null) {
       filters.add(
@@ -813,6 +1010,7 @@ class DatabaseHelper {
     if (paymentMethod != null) {
       paymentJoin = 'JOIN sale_payments sp ON s.id = sp.sale_id';
       filters.add('sp.payment_method = "$paymentMethod"');
+      filters.add('sp.is_deleted = 0');
     }
 
     String whereClause = filters.isNotEmpty
@@ -830,7 +1028,7 @@ class DatabaseHelper {
     String? currency,
   }) async {
     final db = await instance.database;
-    List<String> filters = [];
+    List<String> filters = ['is_deleted = 0'];
     if (start != null && end != null) {
       final sStr = start.toIso8601String().substring(0, 10);
       final eStr = end.toIso8601String().substring(0, 10);
@@ -850,7 +1048,7 @@ class DatabaseHelper {
     int? productId,
   }) async {
     final db = await instance.database;
-    String where = 's.balance_due > 0';
+    String where = 's.balance_due > 0 AND s.is_deleted = 0 AND c.is_deleted = 0';
     List<dynamic> args = [];
     if (currency != null) {
       where += ' AND s.currency_code = ?';
@@ -873,7 +1071,7 @@ class DatabaseHelper {
     int? productId,
   }) async {
     final db = await instance.database;
-    List<String> filters = ['tax_amount > 0'];
+    List<String> filters = ['tax_amount > 0', 'is_deleted = 0'];
     if (start != null && end != null) {
       filters.add(
         'date(created_at) BETWEEN "${start.toIso8601String().substring(0, 10)}" AND "${end.toIso8601String().substring(0, 10)}"',
@@ -890,13 +1088,17 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getEquityBreakdown() async {
     final db = await instance.database;
-    return await db.query('equity_ledger', orderBy: 'created_at DESC');
+    return await db.query(
+      'equity_ledger',
+      where: 'is_deleted = 0',
+      orderBy: 'created_at DESC',
+    );
   }
 
   // Metrics
   Future<double> getInventoryValue({String? currency, int? productId}) async {
     final db = await instance.database;
-    String where = 'remaining_eggs > 0';
+    String where = 'remaining_eggs > 0 AND is_deleted = 0';
     List<dynamic> args = [];
     if (currency != null) {
       where += ' AND currency_code = ?';
@@ -925,7 +1127,7 @@ class DatabaseHelper {
     int? productId,
   }) async {
     final db = await instance.database;
-    String where = 'balance_due > 0';
+    String where = 'balance_due > 0 AND is_deleted = 0';
     List<dynamic> args = [];
     if (currency != null) {
       where += ' AND currency_code = ?';
@@ -953,8 +1155,8 @@ class DatabaseHelper {
   }) async {
     final db = await instance.database;
     final where = productId != null
-        ? 'WHERE p.product_id = $productId AND p.remaining_eggs > 0'
-        : 'WHERE p.remaining_eggs > 0';
+        ? 'WHERE p.product_id = $productId AND p.remaining_eggs > 0 AND p.is_deleted = 0'
+        : 'WHERE p.remaining_eggs > 0 AND p.is_deleted = 0';
     return await db.rawQuery('''
       SELECT p.*, s.name as supplier_name
       FROM purchases p
@@ -978,11 +1180,11 @@ class DatabaseHelper {
     String salesPaymentFilter = '';
     if (paymentMethod != null) {
       paymentJoin = 'JOIN sale_payments sp ON s.id = sp.sale_id';
-      salesPaymentFilter = 'sp.payment_method = "$paymentMethod"';
+      salesPaymentFilter = 'sp.payment_method = "$paymentMethod" AND sp.is_deleted = 0';
     }
 
     // --- Filters for purchases ---
-    List<String> purchaseFilters = [];
+    List<String> purchaseFilters = ['is_deleted = 0'];
     if (start != null && end != null) {
       final sStr = start.toIso8601String().substring(0, 10);
       final eStr = end.toIso8601String().substring(0, 10);
@@ -1003,7 +1205,7 @@ class DatabaseHelper {
         : '';
 
     // --- Filters for expenses ---
-    List<String> expenseFilters = [];
+    List<String> expenseFilters = ['is_deleted = 0'];
     if (start != null && end != null) {
       final sStr = start.toIso8601String().substring(0, 10);
       final eStr = end.toIso8601String().substring(0, 10);
@@ -1018,7 +1220,7 @@ class DatabaseHelper {
         : '';
 
     // --- Filters for sales (s. prefix for sale table, sp. for sale_payments) ---
-    List<String> salesFilters = [];
+    List<String> salesFilters = ['s.is_deleted = 0'];
     if (start != null && end != null) {
       final sStr = start.toIso8601String().substring(0, 10);
       final eStr = end.toIso8601String().substring(0, 10);
@@ -1149,8 +1351,8 @@ class DatabaseHelper {
     final startDateStr = startDate.toIso8601String().substring(0, 10);
 
     final where = productId != null
-        ? 'date(created_at) >= ? AND product_id = ?'
-        : 'date(created_at) >= ?';
+        ? 'date(created_at) >= ? AND product_id = ? AND is_deleted = 0'
+        : 'date(created_at) >= ? AND is_deleted = 0';
     final args = productId != null ? [startDateStr, productId] : [startDateStr];
 
     final result = await db.rawQuery('''
@@ -1177,7 +1379,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getExpenseDistribution() async {
     final db = await instance.database;
     final result = await db.rawQuery(
-      'SELECT expense_type, amount, exchange_rate FROM expenses',
+      'SELECT expense_type, amount, exchange_rate FROM expenses WHERE is_deleted = 0',
     );
     Map<String, double> typeTotals = {};
     for (var row in result) {
@@ -1196,12 +1398,30 @@ class DatabaseHelper {
 
   Future<int> deleteSupplier(int id) async {
     final db = await instance.database;
-    return await db.delete('suppliers', where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'suppliers',
+      {
+        'is_deleted': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteCustomer(int id) async {
     final db = await instance.database;
-    return await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'customers',
+      {
+        'is_deleted': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deletePurchase(int purchaseId) async {
@@ -1214,24 +1434,41 @@ class DatabaseHelper {
       );
       if (purchaseResult.isEmpty) return 0;
       final crates = purchaseResult.first['trays'] as int;
-      final count = await txn.delete(
+      final productId = purchaseResult.first['product_id'] as int;
+
+      final count = await txn.update(
         'purchases',
+        {
+          'is_deleted': 1,
+          'last_updated': DateTime.now().toIso8601String(),
+          'is_synced': 0,
+        },
         where: 'id = ?',
         whereArgs: [purchaseId],
       );
+
       final lastInventory = await txn.query(
         'inventory',
+        where: 'product_id = ?',
+        whereArgs: [productId],
         orderBy: 'id DESC',
         limit: 1,
       );
       final currentBalance = lastInventory.isNotEmpty
           ? lastInventory.first['balance'] as int
           : 0;
+
+      final inventorySyncData = generateSyncData();
       await txn.insert('inventory', {
+        'product_id': productId,
         'trays_in': 0,
         'trays_out': crates,
         'balance': currentBalance - crates,
         'created_at': DateTime.now().toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
       return count;
     });
@@ -1247,24 +1484,41 @@ class DatabaseHelper {
       );
       if (saleResult.isEmpty) return 0;
       final crates = saleResult.first['trays_sold'] as int;
-      final count = await txn.delete(
+      final productId = saleResult.first['product_id'] as int;
+
+      final count = await txn.update(
         'sales',
+        {
+          'is_deleted': 1,
+          'last_updated': DateTime.now().toIso8601String(),
+          'is_synced': 0,
+        },
         where: 'id = ?',
         whereArgs: [saleId],
       );
+
       final lastInventory = await txn.query(
         'inventory',
+        where: 'product_id = ?',
+        whereArgs: [productId],
         orderBy: 'id DESC',
         limit: 1,
       );
       final currentBalance = lastInventory.isNotEmpty
           ? lastInventory.first['balance'] as int
           : 0;
+
+      final inventorySyncData = generateSyncData();
       await txn.insert('inventory', {
+        'product_id': productId,
         'trays_in': crates,
         'trays_out': 0,
         'balance': currentBalance + crates,
         'created_at': DateTime.now().toIso8601String(),
+        'uuid': inventorySyncData['uuid'],
+        'last_updated': inventorySyncData['last_updated'],
+        'is_synced': 0,
+        'is_deleted': 0,
       });
       return count;
     });
@@ -1272,19 +1526,29 @@ class DatabaseHelper {
 
   Future<int> deleteExpense(int id) async {
     final db = await instance.database;
-    return await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
+    return await db.update(
+      'expenses',
+      {
+        'is_deleted': 1,
+        'last_updated': DateTime.now().toIso8601String(),
+        'is_synced': 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // Receipt Settings
   Future<Map<String, dynamic>> getReceiptSettings() async {
     final db = await instance.database;
-    final result = await db.query('receipt_settings', where: 'id = 1');
+    final result = await db.query('receipt_settings', where: 'id = 1 AND is_deleted = 0');
     if (result.isNotEmpty) return result.first;
     return {};
   }
 
   Future<int> updateReceiptSettings(Map<String, dynamic> settings) async {
     final db = await instance.database;
+    final syncData = generateSyncData();
 
     final data = {
       'id': 1,
@@ -1301,6 +1565,10 @@ class DatabaseHelper {
       'predefined_taxes': settings['predefined_taxes'] ?? '[]',
       'payment_method_charges': settings['payment_method_charges'] ?? '[]',
       'remembered_printer_address': settings['remembered_printer_address'],
+      'uuid': settings['uuid'] ?? syncData['uuid'],
+      'last_updated': DateTime.now().toIso8601String(),
+      'is_synced': 0,
+      'is_deleted': 0,
     };
 
     return await db.insert(
@@ -1313,13 +1581,13 @@ class DatabaseHelper {
   Future<List<String>> getDistinctCurrencies() async {
     final db = await instance.database;
     final salesResult = await db.rawQuery(
-      'SELECT DISTINCT currency_code FROM sales',
+      'SELECT DISTINCT currency_code FROM sales WHERE is_deleted = 0',
     );
     final expensesResult = await db.rawQuery(
-      'SELECT DISTINCT currency_code FROM expenses',
+      'SELECT DISTINCT currency_code FROM expenses WHERE is_deleted = 0',
     );
     final purchasesResult = await db.rawQuery(
-      'SELECT DISTINCT currency_code FROM purchases',
+      'SELECT DISTINCT currency_code FROM purchases WHERE is_deleted = 0',
     );
 
     final set = <String>{};
@@ -1344,7 +1612,7 @@ class DatabaseHelper {
   Future<List<String>> getDistinctPaymentMethods() async {
     final db = await instance.database;
     final result = await db.rawQuery(
-      'SELECT DISTINCT payment_method FROM sale_payments',
+      'SELECT DISTINCT payment_method FROM sale_payments WHERE is_deleted = 0',
     );
     final set = <String>{};
     for (var row in result) {
@@ -1363,5 +1631,37 @@ class DatabaseHelper {
   Future close() async {
     final db = await instance.database;
     db.close();
+  }
+
+  // --- Sync Helpers ---
+
+  static Map<String, dynamic> generateSyncData() {
+    return {
+      'uuid': _uuid.v4(),
+      'last_updated': DateTime.now().toIso8601String(),
+      'is_synced': 0,
+      'is_deleted': 0,
+    };
+  }
+
+  Future<void> _migrateToSync(Database db, List<String> tables) async {
+    for (var table in tables) {
+      final results = await db.query(table);
+      for (var row in results) {
+        if (row['uuid'] == null) {
+          await db.update(
+            table,
+            {
+              'uuid': _uuid.v4(),
+              'last_updated': DateTime.now().toIso8601String(),
+              'is_synced': 0,
+              'is_deleted': 0,
+            },
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        }
+      }
+    }
   }
 }

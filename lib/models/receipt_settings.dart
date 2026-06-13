@@ -15,6 +15,10 @@ class ReceiptSettings {
   final List<Map<String, dynamic>> predefinedTaxes;
   final List<PaymentMethodCharge> paymentMethodCharges;
   final String? rememberedPrinterAddress;
+  final String? uuid;
+  final DateTime? lastUpdated;
+  final bool isSynced;
+  final bool isDeleted;
 
   ReceiptSettings({
     required this.businessName,
@@ -30,6 +34,10 @@ class ReceiptSettings {
     this.predefinedTaxes = const [],
     this.paymentMethodCharges = const [],
     this.rememberedPrinterAddress,
+    this.uuid,
+    this.lastUpdated,
+    this.isSynced = false,
+    this.isDeleted = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -47,6 +55,10 @@ class ReceiptSettings {
       'predefined_taxes': jsonEncode(predefinedTaxes),
       'payment_method_charges': jsonEncode(paymentMethodCharges.map((c) => c.toMap()).toList()),
       'remembered_printer_address': rememberedPrinterAddress,
+      'uuid': uuid,
+      'last_updated': lastUpdated?.toIso8601String(),
+      'is_synced': isSynced ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -93,6 +105,10 @@ class ReceiptSettings {
       predefinedTaxes: taxes,
       paymentMethodCharges: charges,
       rememberedPrinterAddress: map['remembered_printer_address'],
+      uuid: map['uuid'],
+      lastUpdated: map['last_updated'] != null ? DateTime.parse(map['last_updated']) : null,
+      isSynced: (map['is_synced'] as int?) == 1,
+      isDeleted: (map['is_deleted'] as int?) == 1,
     );
   }
 
@@ -110,6 +126,10 @@ class ReceiptSettings {
     List<Map<String, dynamic>>? predefinedTaxes,
     List<PaymentMethodCharge>? paymentMethodCharges,
     String? rememberedPrinterAddress,
+    String? uuid,
+    DateTime? lastUpdated,
+    bool? isSynced,
+    bool? isDeleted,
   }) {
     return ReceiptSettings(
       businessName: businessName ?? this.businessName,
@@ -125,6 +145,10 @@ class ReceiptSettings {
       predefinedTaxes: predefinedTaxes ?? this.predefinedTaxes,
       paymentMethodCharges: paymentMethodCharges ?? this.paymentMethodCharges,
       rememberedPrinterAddress: rememberedPrinterAddress ?? this.rememberedPrinterAddress,
+      uuid: uuid ?? this.uuid,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      isSynced: isSynced ?? this.isSynced,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

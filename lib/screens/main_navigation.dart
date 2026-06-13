@@ -57,6 +57,23 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
           tooltip: 'Switch Product',
         ),
         actions: [
+          Consumer(
+            builder: (context, ref, child) {
+              final syncService = ref.watch(syncServiceProvider);
+              final authState = ref.watch(authStateProvider);
+              
+              if (authState.value == null) return const SizedBox.shrink();
+
+              return IconButton(
+                icon: Icon(
+                  syncService.isSyncing ? Icons.sync : Icons.cloud_done,
+                  color: syncService.isSyncing ? InstaPalette.accent : Colors.green,
+                ),
+                onPressed: () => syncService.syncAll(),
+                tooltip: 'Sync with Cloud',
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings, color: InstaPalette.textPrimary),
             onPressed: () {

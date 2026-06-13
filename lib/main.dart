@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/product_selection_screen.dart';
+import 'screens/auth_screen.dart';
 import 'database/database_helper.dart';
 import 'theme/insta_theme.dart';
+import 'providers/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
 
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
@@ -24,11 +29,13 @@ Future<void> main() async {
   runApp(const ProviderScope(child: ZayiApp()));
 }
 
-class ZayiApp extends StatelessWidget {
+class ZayiApp extends ConsumerWidget {
   const ZayiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
     return MaterialApp(
       title: 'Zayi',
       debugShowCheckedModeBanner: false,
@@ -70,7 +77,11 @@ class ZayiApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const ProductSelectionScreen(),
+      home: authState.when(
+        data: (user) => user != null ? const ProductSelectionScreen() : const AuthScreen(),
+        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (e, s) => Scaffold(body: Center(child: Text('Error: $e'))),
+      ),
     );
   }
 }

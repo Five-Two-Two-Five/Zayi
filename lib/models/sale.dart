@@ -22,6 +22,10 @@ class Sale {
   final double longitude;
   final String currencyCode;
   final double exchangeRate;
+  final String? uuid;
+  final DateTime? lastUpdated;
+  final bool isSynced;
+  final bool isDeleted;
 
   Sale({
     this.id,
@@ -47,6 +51,10 @@ class Sale {
     required this.longitude,
     this.currencyCode = 'USD',
     this.exchangeRate = 1.0,
+    this.uuid,
+    this.lastUpdated,
+    this.isSynced = false,
+    this.isDeleted = false,
   });
 
   int get totalEggsSold => (cratesSold * 30) + eggsSold;
@@ -76,6 +84,10 @@ class Sale {
       'longitude': longitude,
       'currency_code': currencyCode,
       'exchange_rate': exchangeRate,
+      'uuid': uuid,
+      'last_updated': lastUpdated?.toIso8601String(),
+      'is_synced': isSynced ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -104,6 +116,10 @@ class Sale {
       longitude: (map['longitude'] as num?)?.toDouble() ?? 0.0,
       currencyCode: map['currency_code'] ?? 'USD',
       exchangeRate: (map['exchange_rate'] as num?)?.toDouble() ?? 1.0,
+      uuid: map['uuid'],
+      lastUpdated: map['last_updated'] != null ? DateTime.parse(map['last_updated']) : null,
+      isSynced: (map['is_synced'] as int?) == 1,
+      isDeleted: (map['is_deleted'] as int?) == 1,
     );
   }
 
@@ -131,6 +147,10 @@ class Sale {
     double? longitude,
     String? currencyCode,
     double? exchangeRate,
+    String? uuid,
+    DateTime? lastUpdated,
+    bool? isSynced,
+    bool? isDeleted,
   }) {
     return Sale(
       id: id ?? this.id,
@@ -156,6 +176,10 @@ class Sale {
       longitude: longitude ?? this.longitude,
       currencyCode: currencyCode ?? this.currencyCode,
       exchangeRate: exchangeRate ?? this.exchangeRate,
+      uuid: uuid ?? this.uuid,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      isSynced: isSynced ?? this.isSynced,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }
