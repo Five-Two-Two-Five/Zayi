@@ -121,7 +121,7 @@ class SalesDao {
       final id = await txn.insert('sales', updatedSale.toMap());
 
       // 5. Update inventory (unit balance)
-      final inventorySyncData = DatabaseHelper.instance.generateSyncData();
+      final inventorySyncData = DatabaseHelper.generateSyncData();
       await txn.insert('inventory', {
         'product_id': sale.productId,
         'trays_in': 0,
@@ -193,7 +193,7 @@ class SalesDao {
           ? lastInventory.first['balance'] as int
           : 0;
           
-      final inventorySyncData = DatabaseHelper.instance.generateSyncData();
+      final inventorySyncData = DatabaseHelper.generateSyncData();
       await txn.insert('inventory', {
         'product_id': productId,
         'trays_in': crates,
